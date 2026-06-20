@@ -17,6 +17,7 @@ import {
   Activity,
   ArrowLeft,
   ChevronLeft,
+  ChevronRight,
   Calendar,
   Lock,
 } from 'lucide-react';
