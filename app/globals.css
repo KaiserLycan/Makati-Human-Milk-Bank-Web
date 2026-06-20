@@ -8,8 +8,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --color-brand-teal: #00afb9;
+  --color-brand-teal-dark: #008f99;
+  --color-brand-charcoal: #312f2f;
+  --color-brand-teal-darker: #00696f;
 }
 
 @media (prefers-color-scheme: dark) {
