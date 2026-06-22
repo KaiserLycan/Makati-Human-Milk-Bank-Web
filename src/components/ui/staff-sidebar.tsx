@@ -45,13 +45,13 @@ interface StaffSidebarProps {
 export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
   const router = useRouter();
 
-  // Navigation Collapsibles
   const [donorsOpen, setDonorsOpen] = useState(true);
   const [beneficiariesOpen, setBeneficiariesOpen] = useState(true);
   const [showSidebarNotification, setShowSidebarNotification] = useState(true);
-
-  // Profile Modal State
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
     name: 'Alice May Miller',
     id: '2024102114',
@@ -60,45 +60,65 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
   });
 
   useEffect(() => {
-    // Load profile role from storage
     const stored = loadProfile();
     setProfile(stored);
-
     const timer = setTimeout(() => {
       setShowSidebarNotification(false);
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Sync role to storage and refresh local state
   const handleRoleChange = (role: 'manager' | 'staff') => {
     const updated = { ...profile, role };
     setProfile(updated);
     saveProfile(updated);
-    // Reload page to reflect changes globally
     reloadWindow();
   };
 
   const handleLogout = () => {
-    router.push('/work');
+    setLogoutError(null);
+    setIsLogoutOpen(true);
   };
 
-  // Check if item is active
-  const getLinkClass = (item: typeof activeItem) => {
-    return `flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+  const handleLogoutConfirm = async () => {
+    setIsLoggingOut(true);
+    setLogoutError(null);
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Logout failed. Please try again.');
+      }
+      router.push('/');
+    } catch (err) {
+      setLogoutError(
+        err instanceof Error ? err.message : 'Logout failed. Please try again.'
+      );
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleLogoutCancel = () => {
+    setIsLogoutOpen(false);
+    setLogoutError(null);
+  };
+
+  const getLinkClass = (item: typeof activeItem) =>
+    `flex items-center gap-3 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
       activeItem === item
         ? 'bg-brand-teal/10 text-brand-teal font-bold shadow-[0_2px_8px_rgba(0,175,185,0.05)]'
         : 'text-neutral-600 hover:bg-neutral-50 hover:text-brand-teal'
     }`;
-  };
 
-  const getSubLinkClass = (item: typeof activeItem) => {
-    return `block px-3 py-2 text-sm rounded-lg transition-colors ${
+  const getSubLinkClass = (item: typeof activeItem) =>
+    `block px-3 py-2 text-sm rounded-lg transition-colors ${
       activeItem === item
         ? 'bg-brand-teal/10 text-brand-teal font-bold'
         : 'text-neutral-500 hover:text-brand-teal hover:bg-neutral-50'
     }`;
-  };
 
   return (
     <>
@@ -115,19 +135,16 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
 
           {/* Nav links */}
           <nav className="space-y-1.5">
-            {/* Dashboard Link */}
             <Link href="/work/dashboard" className={getLinkClass('dashboard')} data-testid="nav-dashboard">
               <LayoutDashboard className="size-5 shrink-0" />
               <span>Dashboard</span>
             </Link>
 
-            {/* Reports Link */}
             <Link href="/work/reports" className={getLinkClass('reports')} data-testid="nav-reports">
               <FileText className="size-5 shrink-0" />
               <span>Reports</span>
             </Link>
 
-            {/* Collection Link */}
             <Link href="/work/collection" className={getLinkClass('collection')} data-testid="nav-collection">
               <ClipboardList className="size-5 shrink-0" />
               <span>Collection</span>
@@ -135,7 +152,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
 
             <hr className="border-neutral-100 my-2" />
 
-            {/* Collapsible Donors Section */}
+            {/* Donors */}
             <div>
               <button
                 onClick={() => setDonorsOpen(!donorsOpen)}
@@ -152,24 +169,19 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                   <ChevronRight className="size-4 text-neutral-400" />
                 )}
               </button>
-
               {donorsOpen && (
                 <div className="pl-9 pr-2 mt-1 space-y-1">
                   <Link href="/work/donor" className={getSubLinkClass('donors')} data-testid="nav-sub-donors">
                     Donors
                   </Link>
-                  <Link
-                    href="/work/applicant-donor"
-                    className={getSubLinkClass('applicants-donors')}
-                    data-testid="nav-sub-applicants"
-                  >
+                  <Link href="/work/applicant-donor" className={getSubLinkClass('applicants-donors')} data-testid="nav-sub-applicants">
                     Applicants
                   </Link>
                 </div>
               )}
             </div>
 
-            {/* Collapsible Beneficiaries Section */}
+            {/* Beneficiaries */}
             <div>
               <button
                 onClick={() => setBeneficiariesOpen(!beneficiariesOpen)}
@@ -186,21 +198,12 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                   <ChevronRight className="size-4 text-neutral-400" />
                 )}
               </button>
-
               {beneficiariesOpen && (
                 <div className="pl-9 pr-2 mt-1 space-y-1">
-                  <Link
-                    href="/work/beneficiary"
-                    className={getSubLinkClass('beneficiaries')}
-                    data-testid="nav-sub-beneficiaries"
-                  >
+                  <Link href="/work/beneficiary" className={getSubLinkClass('beneficiaries')} data-testid="nav-sub-beneficiaries">
                     Beneficiaries
                   </Link>
-                  <Link
-                    href="/work/applicant-beneficiary"
-                    className={getSubLinkClass('applicants-beneficiaries')}
-                    data-testid="nav-sub-beneficiary-applicants"
-                  >
+                  <Link href="/work/applicant-beneficiary" className={getSubLinkClass('applicants-beneficiaries')} data-testid="nav-sub-beneficiary-applicants">
                     Applicants
                   </Link>
                 </div>
@@ -209,34 +212,28 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
 
             <hr className="border-neutral-100 my-2" />
 
-            {/* Pool Milk */}
             <Link href="/work/pool" className={getLinkClass('pool')} data-testid="nav-pool">
               <Combine className="size-5 shrink-0" />
               <span>Pool Milk</span>
             </Link>
 
-            {/* Milk Inventory */}
             <Link href="/work/inventory" className={getLinkClass('inventory')} data-testid="nav-inventory">
               <Database className="size-5 shrink-0" />
               <span>Milk Inventory</span>
             </Link>
 
-            {/* Milk Requests */}
             <Link href="/work/requests" className={getLinkClass('requests')} data-testid="nav-requests">
               <FileText className="size-5 shrink-0" />
               <span>Milk Requests</span>
             </Link>
 
-            {/* Manage Users & Audits (Manager ONLY) */}
             {profile?.role === 'manager' && (
               <>
                 <hr className="border-neutral-100 my-2" />
-
                 <Link href="/work/users" className={getLinkClass('users')} data-testid="nav-users">
                   <UserCheck className="size-5 shrink-0" />
                   <span>Manage Users</span>
                 </Link>
-
                 <Link href="/work/audits" className={getLinkClass('audits')} data-testid="nav-audits">
                   <History className="size-5 shrink-0" />
                   <span>Audits</span>
@@ -246,7 +243,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
           </nav>
         </div>
 
-        {/* Footer profile details block */}
+        {/* Footer */}
         <div className="p-4 space-y-4 bg-neutral-50 border-t border-neutral-100 shrink-0">
           {showSidebarNotification && (
             <div
@@ -295,15 +292,16 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
         </div>
       </aside>
 
-      {/* STAFF PROFILE DETAILS OVERLAY MODAL */}
+      {/* PROFILE MODAL */}
       {isProfileOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="profile-modal">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto"
+          data-testid="profile-modal"
+        >
           <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="bg-white border-b border-neutral-200 px-6 py-4.5 flex items-center justify-between">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <User className="size-5.5 text-brand-teal" />
+                <User className="size-5 text-brand-teal" />
                 <h3 className="text-lg font-bold text-neutral-900">My Staff Profile</h3>
               </div>
               <button
@@ -316,9 +314,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-8 flex flex-col items-center text-center space-y-6">
-              {/* Avatar circle */}
               <div className="size-28 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
                 AM
               </div>
@@ -332,10 +328,9 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
 
               <hr className="w-full border-neutral-100" />
 
-              {/* Stats Card */}
               <div className="w-full text-left space-y-3.5 text-xs">
                 <div className="flex items-center gap-3.5">
-                  <Mail className="size-4.5 text-neutral-400" />
+                  <Mail className="size-4 text-neutral-400" />
                   <div>
                     <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Email Address</p>
                     <p className="font-bold text-neutral-800">{profile?.email}</p>
@@ -343,7 +338,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                 </div>
 
                 <div className="flex items-center gap-3.5">
-                  <Calendar className="size-4.5 text-neutral-400" />
+                  <Calendar className="size-4 text-neutral-400" />
                   <div>
                     <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Joined Date</p>
                     <p className="font-bold text-neutral-800">October 21, 2024</p>
@@ -351,13 +346,11 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                 </div>
 
                 <div className="flex items-center gap-3.5">
-                  <Shield className="size-4.5 text-neutral-400" />
+                  <Shield className="size-4 text-neutral-400" />
                   <div className="flex-1">
                     <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Role Access Level</p>
                     <div className="flex items-center justify-between mt-1">
                       <span className="font-bold text-neutral-800 capitalize">{profile?.role}</span>
-                      
-                      {/* Interactive Role Toggle Switch */}
                       <select
                         value={profile?.role}
                         onChange={(e) => handleRoleChange(e.target.value as 'manager' | 'staff')}
@@ -372,7 +365,83 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
+      {/* LOGOUT CONFIRMATION MODAL */}
+      {isLogoutOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4"
+          data-testid="logout-modal"
+        >
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-sm relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <LogOut className="size-5 text-red-500" />
+                <h3 className="text-base font-bold text-neutral-900">Confirm Logout</h3>
+              </div>
+              <button
+                onClick={handleLogoutCancel}
+                disabled={isLoggingOut}
+                className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all disabled:opacity-50"
+                aria-label="Close logout modal"
+                data-testid="close-logout-btn"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-neutral-600 leading-relaxed">
+                Are you sure you want to log out? You will be redirected to the home page.
+              </p>
+
+              {logoutError && (
+                <div
+                  className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium animate-in fade-in duration-200"
+                  data-testid="logout-error"
+                >
+                  {logoutError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleLogoutCancel}
+                  disabled={isLoggingOut}
+                  className="flex-1 h-11 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all disabled:opacity-50"
+                  data-testid="cancel-logout-btn"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogoutConfirm}
+                  disabled={isLoggingOut}
+                  className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  data-testid="confirm-logout-btn"
+                >
+                  {isLoggingOut ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Logging out...
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="size-4" />
+                      Log Out
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
