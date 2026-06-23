@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent, DragEvent } from 'react';
 import Link from 'next/link';
 import { Droplet, Menu, X } from 'lucide-react';
 
@@ -27,9 +27,12 @@ export default function Navbar() {
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-brand-teal p-2 rounded-full text-white transition-transform group-hover:scale-105 duration-300">
-              <Droplet className="size-5 fill-white" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logoClear.png"
+              alt="MHMB Logo"
+              className="h-9 w-9 rounded-full object-cover transition-transform group-hover:scale-105 duration-300"
+            />
             <span className="font-sans font-bold text-lg text-neutral-900 tracking-tight">
               MHMB
             </span>
