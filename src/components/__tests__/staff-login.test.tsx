@@ -2,11 +2,21 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StaffLogin from '../staff-login';
 
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => {
+  return {
+    useRouter: () => ({
+      push: mockPush,
+    }),
+  };
+});
+
 describe('StaffLogin Component', () => {
   const mockOnLoginSuccess = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = jest.fn();
   });
 
   it('renders all login elements, header text, and inputs', () => {
@@ -56,6 +66,15 @@ describe('StaffLogin Component', () => {
   });
 
   it('displays error message on incorrect credentials submission', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        message: 'Invalid Employee Email or Password.',
+      }),
+    });
+
     render(<StaffLogin onLoginSuccess={mockOnLoginSuccess} />);
 
     fireEvent.change(screen.getByTestId('employee-email-input'), { target: { value: 'wrong@mhmb.gov' } });
@@ -81,6 +100,21 @@ describe('StaffLogin Component', () => {
   });
 
   it('displays success message and triggers onLoginSuccess on correct credentials submission', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        message: 'Logged in successfully.',
+        data: {
+          user_id: 'U001',
+          name: 'Alice May Miller',
+          email: 'staff@mhmb.gov',
+          role: 'manager',
+        },
+      }),
+    });
+
     render(<StaffLogin onLoginSuccess={mockOnLoginSuccess} />);
 
     fireEvent.change(screen.getByTestId('employee-email-input'), { target: { value: 'staff@mhmb.gov' } });
