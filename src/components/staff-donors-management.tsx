@@ -1100,41 +1100,95 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
                 {/* Profile actions */}
                 <div className="space-y-3.5">
+                  
+                  {/* BUTTON 1: TOGGLE STATUS OR APPROVE */}
                   <button 
-                    onClick={() => {
-                      if (mode === 'donors' && selectedDonor) {
-                        setDonors(donors.map((d) => d.id === selectedDonor.id ? { ...d, status: d.status === 'Active' ? 'Inactive' : 'Active' } : d));
+                    onClick={async () => {
+                      const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
+                      if (!targetId) return; // Safety check
+
+                      try {
+                        if (mode === 'donors') {
+                          // If it's an existing donor, toggle them between Active and Inactive
+                          await api.patch(`/api/donors/toggle-status/${targetId}`);
+                        } else {
+                          // If it's an applicant, approve their application!
+                          await api.patch(`/api/donors/approve/${targetId}`);
+                        }
+                        
+                        // Instantly refresh the table from the database to show the updated status
+                        fetchAllDonors(); 
+                        
+                        // Close the modal
                         setSelectedDonor(null);
-                      } else if (mode === 'applicants' && selectedApplicant) {
-                        setApplicants(applicants.map((a) => a.id === selectedApplicant.id ? { ...a, application_status: a.application_status === 'Approved' ? 'Pending' : 'Approved' } : a));
                         setSelectedApplicant(null);
+                      } catch (error) {
+                        console.error("Failed to update status", error);
+                        alert("Failed to update status. Check console.");
                       }
                     }}
                     className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
-                    data-testid="toggle-profile-status-btn"
                   >
+                    {/* Change button text based on what view we are in */}
                     {mode === 'donors' 
                       ? ((selectedDonor?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
-                      : ((selectedApplicant?.application_status === 'Approved') ? 'Mark as Pending' : 'Approve Profile')
+                      : 'Approve Application'
                     }
                   </button>
+
+                  {/* BUTTON 2: REJECT APPLICANT (Only shows up in Applicant mode to satisfy GitHub issue) */}
+                  {mode === 'applicants' && (
+                    <button 
+                      onClick={async () => {
+                        const targetId = selectedApplicant?.id;
+                        if (!targetId) return;
+
+                        // Add a browser confirmation popup so staff don't accidentally click this
+                        if (!window.confirm("Are you sure you want to REJECT this application?")) return;
+
+                        try {
+                          // Hit the specific reject route on your Express backend
+                          await api.patch(`/api/donors/reject/${targetId}`);
+                          fetchAllDonors();
+                          setSelectedApplicant(null);
+                        } catch (error) {
+                          console.error("Failed to reject application", error);
+                        }
+                      }}
+                      className="w-full py-2.5 text-xs font-bold text-amber-600 hover:text-white bg-white hover:bg-amber-600 border border-neutral-200 hover:border-amber-600 rounded-xl transition-all shadow-sm"
+                    >
+                      Reject Application
+                    </button>
+                  )}
+
+                  {/* BUTTON 3: PERMANENTLY DELETE */}
                   <button 
-                    onClick={() => {
-                      if (mode === 'donors' && selectedDonor) {
-                        setDonors(donors.filter((d) => d.id !== selectedDonor.id));
+                    onClick={async () => {
+                      const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
+                      if (!targetId) return;
+
+                      // Extremely important to verify before permanently deleting from the DB
+                      if (!window.confirm("Are you sure you want to permanently delete this profile from the database?")) return;
+
+                      try {
+                        // Tell the backend to completely drop the row from PostgreSQL
+                        await api.delete(`/api/donors/${targetId}`);
+                        
+                        // Refresh the UI
+                        fetchAllDonors();
                         setSelectedDonor(null);
-                      } else if (mode === 'applicants' && selectedApplicant) {
-                        setApplicants(applicants.filter((a) => a.id !== selectedApplicant.id));
                         setSelectedApplicant(null);
+                      } catch (error) {
+                        console.error("Failed to delete profile", error);
                       }
                     }}
                     className="w-full py-2.5 text-xs font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-neutral-200 hover:border-rose-600 rounded-xl transition-all shadow-sm"
-                    data-testid="delete-profile-btn"
                   >
                     Delete Profile
                   </button>
                 </div>
               </div>
+
 
               {/* Right Column: Main Collapsible Cards */}
               <div className="flex-1 space-y-6">
