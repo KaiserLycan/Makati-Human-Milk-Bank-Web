@@ -107,4 +107,133 @@ describe('StaffSidebar Component', () => {
     );
     expect(reloadWindow).toHaveBeenCalled();
   });
+
+  it('opens logout confirmation modal when logout button is clicked', () => {
+    (storage.loadProfile as jest.Mock).mockReturnValue({
+      name: 'Alice May Miller',
+      id: '2024102114',
+      email: 'staff@mhmb.gov',
+      role: 'manager',
+    });
+    (storage.loadUsers as jest.Mock).mockReturnValue([]);
+
+    render(<StaffSidebar activeItem="dashboard" />);
+
+    // Logout modal should not be visible initially
+    expect(screen.queryByTestId('logout-modal')).not.toBeInTheDocument();
+
+    // Click logout button
+    fireEvent.click(screen.getByTestId('logout-btn'));
+
+    // Logout modal should now be visible
+    expect(screen.getByTestId('logout-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('confirm-logout-btn')).toBeInTheDocument();
+    expect(screen.getByTestId('cancel-logout-btn')).toBeInTheDocument();
+  });
+
+  it('closes logout modal when cancel button is clicked', () => {
+    (storage.loadProfile as jest.Mock).mockReturnValue({
+      name: 'Alice May Miller',
+      id: '2024102114',
+      email: 'staff@mhmb.gov',
+      role: 'manager',
+    });
+    (storage.loadUsers as jest.Mock).mockReturnValue([]);
+
+    render(<StaffSidebar activeItem="dashboard" />);
+
+    // Open modal
+    fireEvent.click(screen.getByTestId('logout-btn'));
+    expect(screen.getByTestId('logout-modal')).toBeInTheDocument();
+
+    // Click cancel
+    fireEvent.click(screen.getByTestId('cancel-logout-btn'));
+
+    // Modal should be gone
+    expect(screen.queryByTestId('logout-modal')).not.toBeInTheDocument();
+  });
+
+  it('closes logout modal when X button is clicked', () => {
+    (storage.loadProfile as jest.Mock).mockReturnValue({
+      name: 'Alice May Miller',
+      id: '2024102114',
+      email: 'staff@mhmb.gov',
+      role: 'manager',
+    });
+    (storage.loadUsers as jest.Mock).mockReturnValue([]);
+
+    render(<StaffSidebar activeItem="dashboard" />);
+
+    // Open modal
+    fireEvent.click(screen.getByTestId('logout-btn'));
+    expect(screen.getByTestId('logout-modal')).toBeInTheDocument();
+
+    // Click X button
+    fireEvent.click(screen.getByTestId('close-logout-btn'));
+
+    // Modal should be gone
+    expect(screen.queryByTestId('logout-modal')).not.toBeInTheDocument();
+  });
+
+  it('calls logout API and redirects to / on success', async () => {
+    (storage.loadProfile as jest.Mock).mockReturnValue({
+      name: 'Alice May Miller',
+      id: '2024102114',
+      email: 'staff@mhmb.gov',
+      role: 'manager',
+    });
+    (storage.loadUsers as jest.Mock).mockReturnValue([]);
+
+    global.fetch = (jest.fn() as jest.MockedFunction<typeof globalThis.fetch>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    } as Response);
+
+    const { waitFor } = await import('@testing-library/react');
+
+    render(<StaffSidebar activeItem="dashboard" />);
+
+    fireEvent.click(screen.getByTestId('logout-btn'));
+    fireEvent.click(screen.getByTestId('confirm-logout-btn'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:5000/api/auth/logout',
+        { method: 'POST', credentials: 'include' }
+      );
+    });
+
+    // Confirm button is disabled while logging out
+    expect(screen.getByTestId('confirm-logout-btn')).toBeDisabled();
+  });
+
+  it('shows error message in modal if logout API fails', async () => {
+    (storage.loadProfile as jest.Mock).mockReturnValue({
+      name: 'Alice May Miller',
+      id: '2024102114',
+      email: 'staff@mhmb.gov',
+      role: 'manager',
+    });
+    (storage.loadUsers as jest.Mock).mockReturnValue([]);
+
+    global.fetch = (jest.fn() as jest.MockedFunction<typeof globalThis.fetch>).mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'Session expired.' }),
+    } as Response);
+
+    render(<StaffSidebar activeItem="dashboard" />);
+
+    // Open modal and confirm
+    fireEvent.click(screen.getByTestId('logout-btn'));
+    fireEvent.click(screen.getByTestId('confirm-logout-btn'));
+
+    // Wait for error to appear
+    const errorEl = await screen.findByTestId('logout-error');
+    expect(errorEl).toHaveTextContent('Session expired.');
+
+    // Modal should still be open
+    expect(screen.getByTestId('logout-modal')).toBeInTheDocument();
+  });
 });
