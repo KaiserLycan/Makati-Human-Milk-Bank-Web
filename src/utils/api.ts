@@ -14,12 +14,6 @@ let resolvedBaseUrl: string | null = null;
 async function getDynamicBaseUrl(): Promise<string> {
   if (resolvedBaseUrl) return resolvedBaseUrl;
 
-  // In development, force local backend
-  if (process.env.NODE_ENV === 'development') {
-    resolvedBaseUrl = 'http://localhost:5000';
-    return resolvedBaseUrl;
-  }
-
   // In production or test environments, immediately resolve to the standard URL
   if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'test') {
     resolvedBaseUrl = API_BASE_URL;
