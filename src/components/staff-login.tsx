@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { api } from '../utils/api';
 import { saveProfile } from '../utils/storage';
 
 export interface StaffLoginProps {
@@ -18,6 +19,13 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('mhmb_logged_in') === 'true') {
+      router.push('/work/dashboard');
+    }
+  }, [router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -31,19 +39,14 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
     setIsLoading(true);
 
     try {
-      const apiBaseUrl = 'https://makati-human-milk-bank-api.onrender.com';
-      const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: employeeEmail, password }),
-        credentials: 'include',
+      const response = await api.post('/api/auth/login', {
+        email: employeeEmail,
+        password,
       });
 
-      const result = await response.json();
+      const result = response.data;
 
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         setError(result.message || 'Invalid Employee Email or Password. Please try again.');
         setIsLoading(false);
         return;
@@ -58,6 +61,9 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
         });
       }
 
+      // Track active session locally
+      localStorage.setItem('mhmb_logged_in', 'true');
+
       setSuccess('Login successful! Redirecting to staff portal...');
 
       if (onLoginSuccess) {
@@ -70,7 +76,11 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
       }, 1500);
 
     } catch (err: any) {
-      setError('Network error: Failed to connect to the server.');
+      if (err.response && err.response.data) {
+        setError(err.response.data.message || 'Invalid Employee Email or Password. Please try again.');
+      } else {
+        setError('Network error: Failed to connect to the server.');
+      }
       setIsLoading(false);
     }
   };

@@ -1,6 +1,13 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StaffLogin from '../staff-login';
+import { api } from '../../utils/api';
+
+jest.mock('../../utils/api', () => ({
+  api: {
+    post: jest.fn(),
+  },
+}));
 
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => {
@@ -16,7 +23,6 @@ describe('StaffLogin Component', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = jest.fn();
   });
 
   it('renders all login elements, header text, and inputs', () => {
@@ -66,14 +72,16 @@ describe('StaffLogin Component', () => {
   });
 
   it('displays error message on incorrect credentials submission', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      json: async () => ({
-        success: false,
-        message: 'Invalid Employee Email or Password.',
-      }),
-    });
+    const errorResponse = {
+      response: {
+        status: 400,
+        data: {
+          success: false,
+          message: 'Invalid Employee Email or Password.',
+        },
+      },
+    };
+    (api.post as jest.Mock).mockRejectedValueOnce(errorResponse);
 
     render(<StaffLogin onLoginSuccess={mockOnLoginSuccess} />);
 
@@ -100,10 +108,9 @@ describe('StaffLogin Component', () => {
   });
 
   it('displays success message and triggers onLoginSuccess on correct credentials submission', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
+    const successResponse = {
       status: 200,
-      json: async () => ({
+      data: {
         success: true,
         message: 'Logged in successfully.',
         data: {
@@ -112,8 +119,9 @@ describe('StaffLogin Component', () => {
           email: 'staff@mhmb.gov',
           role: 'manager',
         },
-      }),
-    });
+      },
+    };
+    (api.post as jest.Mock).mockResolvedValueOnce(successResponse);
 
     render(<StaffLogin onLoginSuccess={mockOnLoginSuccess} />);
 
