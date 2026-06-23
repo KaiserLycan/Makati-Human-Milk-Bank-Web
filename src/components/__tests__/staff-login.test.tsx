@@ -1,6 +1,22 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StaffLogin from '../staff-login';
+import { api } from '../../utils/api';
+
+jest.mock('../../utils/api', () => ({
+  api: {
+    post: jest.fn(),
+  },
+}));
+
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => {
+  return {
+    useRouter: () => ({
+      push: mockPush,
+    }),
+  };
+});
 
 describe('StaffLogin Component', () => {
   const mockOnLoginSuccess = jest.fn();
@@ -56,6 +72,17 @@ describe('StaffLogin Component', () => {
   });
 
   it('displays error message on incorrect credentials submission', async () => {
+    const errorResponse = {
+      response: {
+        status: 400,
+        data: {
+          success: false,
+          message: 'Invalid Employee Email or Password.',
+        },
+      },
+    };
+    (api.post as jest.Mock).mockRejectedValueOnce(errorResponse);
+
     render(<StaffLogin onLoginSuccess={mockOnLoginSuccess} />);
 
     fireEvent.change(screen.getByTestId('employee-email-input'), { target: { value: 'wrong@mhmb.gov' } });
@@ -81,6 +108,21 @@ describe('StaffLogin Component', () => {
   });
 
   it('displays success message and triggers onLoginSuccess on correct credentials submission', async () => {
+    const successResponse = {
+      status: 200,
+      data: {
+        success: true,
+        message: 'Logged in successfully.',
+        data: {
+          user_id: 'U001',
+          name: 'Alice May Miller',
+          email: 'staff@mhmb.gov',
+          role: 'manager',
+        },
+      },
+    };
+    (api.post as jest.Mock).mockResolvedValueOnce(successResponse);
+
     render(<StaffLogin onLoginSuccess={mockOnLoginSuccess} />);
 
     fireEvent.change(screen.getByTestId('employee-email-input'), { target: { value: 'staff@mhmb.gov' } });

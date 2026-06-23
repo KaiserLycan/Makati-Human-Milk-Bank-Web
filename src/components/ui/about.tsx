@@ -33,7 +33,9 @@ export default function About() {
               Through community-driven procurement programs—including MOM&apos;s Act (Milk on Move) home pickups, SUPSUP Todo barangay milk-letting drives, Milkyway hospital collections at the Ospital ng Makati, and standard walk-in donations—MHMB bridges the gap between healthy donor mothers and high-risk infants to ensure no critical baby goes without essential nutrition.
               {' '}
               <Link 
-                href="#learn-more" 
+                href="https://www.rappler.com/moveph/59227-makati-human-milk-bank/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="font-bold text-brand-teal hover:text-brand-teal-dark hover:underline underline-offset-4 decoration-solid transition-colors inline-block"
               >
                 Learn More.

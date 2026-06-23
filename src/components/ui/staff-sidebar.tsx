@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { loadProfile, saveProfile, UserProfile } from '../../utils/storage';
 import { reloadWindow } from '../../utils/navigation';
+import { api } from '../../utils/api';
 
 interface StaffSidebarProps {
   activeItem:
@@ -59,6 +60,13 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     role: 'manager',
   });
 
+  // Redirect to login if session is inactive
+  useEffect(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('mhmb_logged_in') !== 'true') {
+      router.push('/work');
+    }
+  }, [router]);
+
   useEffect(() => {
     const stored = loadProfile();
     setProfile(stored);
@@ -75,9 +83,14 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     reloadWindow();
   };
 
-  const handleLogout = () => {
-    setLogoutError(null);
-    setIsLogoutOpen(true);
+  const handleLogout = async () => {
+    try {
+      localStorage.removeItem('mhmb_logged_in');
+      await api.post('/api/auth/logout');
+    } catch (e) {
+      // Ignore network errors on logout
+    }
+    router.push('/work');
   };
 
   const handleLogoutConfirm = async () => {

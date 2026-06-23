@@ -63,63 +63,17 @@ export default function Contact() {
           </div>
 
           {/* Right Column: Stylized Map Card */}
-          <div className="lg:col-span-6 min-h-[350px] lg:min-h-full bg-slate-100 relative group overflow-hidden">
-            {/* Mock Map Background Grid */}
-            <div className="absolute inset-0 bg-[#e5e9f0] opacity-90 flex flex-col justify-between p-6">
-              
-              {/* Fake roads and shapes for map aesthetic */}
-              <div className="absolute inset-0 pointer-events-none opacity-40">
-                {/* Roads */}
-                <div className="absolute top-1/3 left-0 right-0 h-8 bg-white rotate-12" />
-                <div className="absolute top-0 bottom-0 left-1/4 w-8 bg-white -rotate-45" />
-                <div className="absolute top-0 bottom-0 left-2/3 w-10 bg-white rotate-6" />
-                {/* Green park mockup */}
-                <div className="absolute bottom-10 right-10 size-32 bg-emerald-100 rounded-full blur-xl" />
-                {/* River mockup */}
-                <div className="absolute top-10 left-10 size-48 bg-sky-100 rounded-full blur-xl" />
-              </div>
-
-              {/* Map Floating Actions */}
-              <div className="relative z-10 flex justify-between items-start">
-                <div className="bg-white/95 backdrop-blur-sm shadow-md rounded-xl p-3 max-w-[200px] border border-neutral-100 text-neutral-800">
-                  <h4 className="font-sans font-bold text-[13px] leading-tight text-neutral-900">
-                    Bangkal Health Center
-                  </h4>
-                  <p className="font-sans text-[11px] text-neutral-500 mt-1 leading-normal">
-                    4th Floor, Rodriguez St.
-                  </p>
-                </div>
-                <a 
-                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Bangkal Primary Health Care Center Makati")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 bg-brand-teal hover:bg-brand-teal-dark text-white text-[13px] font-semibold px-4 py-2 rounded-xl shadow-md transition-colors"
-                >
-                  <Map className="size-4" />
-                  <span>Open in Maps</span>
-                  <ExternalLink className="size-3" />
-                </a>
-              </div>
-
-              {/* Map Marker Pin */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-                {/* Pulse animation circles */}
-                <div className="absolute size-12 bg-brand-teal/20 rounded-full animate-ping pointer-events-none" />
-                <div className="absolute size-20 bg-brand-teal/10 rounded-full animate-ping pointer-events-none delay-300" />
-                
-                {/* Visual Pin */}
-                <div className="relative z-10 bg-brand-teal border-2 border-white p-2.5 rounded-full shadow-lg text-white">
-                  <MapPin className="size-6 fill-white/20" />
-                </div>
-                {/* Label tail shadow */}
-                <div className="w-3 h-3 bg-brand-teal rotate-45 -mt-1.5 shadow-md border-r border-b border-white" />
-              </div>
-
-              {/* Scale / Legend mockup */}
-              <div className="relative z-10 self-start bg-white/80 backdrop-blur-sm text-neutral-600 text-[10px] px-2 py-1 rounded shadow-sm border border-neutral-100 select-none">
-                50 m
-              </div>
-            </div>
+          <div className="lg:col-span-6 min-h-[350px] lg:min-h-full relative group overflow-hidden">
+            <iframe 
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d6771.747847353008!2d121.01230045539683!3d14.542769492594635!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397c93e47013a1d%3A0xfdf679b2727ee9a4!2sBangkal%20Health%20Center%20-%20Makati%20City%20Health%20Department!5e0!3m2!1sen!2sph!4v1782203237969!5m2!1sen!2sph" 
+              width="100%" 
+              height="100%" 
+              style={{ border:0 }} 
+              allowFullScreen={true} 
+              loading="lazy" 
+              referrerPolicy="no-referrer-when-downgrade"
+              className="absolute inset-0 w-full h-full"
+            ></iframe>
           </div>
 
         </div>
