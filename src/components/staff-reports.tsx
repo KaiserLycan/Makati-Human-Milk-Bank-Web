@@ -198,6 +198,7 @@ export default function StaffReports() {
   };
 
   const handleDownload = () => {
+    if (downloading) return; // Prevent double clicks
     setDownloading(true);
 
     const executeDownload = async () => {
@@ -212,18 +213,20 @@ export default function StaffReports() {
         link.download = `MHMB_${reportType.charAt(0).toUpperCase() + reportType.slice(1)}_Report_${range}.pdf`;
         document.body.appendChild(link);
         link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
+        
+        // Delay cleanup so the browser has time to trigger the download event
+        setTimeout(() => {
+          link.remove();
+          window.URL.revokeObjectURL(url);
+        }, 1000);
       } catch (error) {
         console.error('Failed to download PDF from backend API', error);
+      } finally {
+        setDownloading(false);
       }
     };
 
     executeDownload();
-
-    setTimeout(() => {
-      setDownloading(false);
-    }, 1500);
   };
 
   const handlePrint = () => {
