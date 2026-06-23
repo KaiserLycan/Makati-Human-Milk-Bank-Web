@@ -1,13 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { api } from '../utils/api';
+import { saveProfile } from '../utils/storage';
 
 export interface StaffLoginProps {
   onLoginSuccess?: (employeeEmail: string) => void;
 }
 
 export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
+  const router = useRouter();
   const [employeeEmail, setEmployeeEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,7 +19,14 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('mhmb_logged_in') === 'true') {
+      router.push('/work/dashboard');
+    }
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -27,25 +38,57 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
 
     setIsLoading(true);
 
-    // Mock Login Validation
-    setTimeout(() => {
-      setIsLoading(false);
-      // Success credentials based on new placeholder
-      if (employeeEmail === 'staff@mhmb.gov' && password === 'AliceMiller092405') {
-        setSuccess('Login successful! Redirecting to staff portal...');
-        if (onLoginSuccess) {
-          onLoginSuccess(employeeEmail);
-        }
-      } else {
-        setError('Invalid Employee Email or Password. Please try again.');
+    try {
+      const response = await api.post('/api/auth/login', {
+        email: employeeEmail,
+        password,
+      });
+
+      const result = response.data;
+
+      if (!result.success) {
+        setError(result.message || 'Invalid Employee Email or Password. Please try again.');
+        setIsLoading(false);
+        return;
       }
-    }, 1500);
+
+      if (result.data) {
+        saveProfile({
+          id: result.data.user_id,
+          name: result.data.name,
+          email: result.data.email,
+          role: result.data.role,
+        });
+      }
+
+      // Track active session locally
+      localStorage.setItem('mhmb_logged_in', 'true');
+
+      setSuccess('Login successful! Redirecting to staff portal...');
+
+      if (onLoginSuccess) {
+        onLoginSuccess(employeeEmail);
+      }
+
+      setTimeout(() => {
+        setIsLoading(false);
+        router.push('/work/dashboard');
+      }, 1500);
+
+    } catch (err: any) {
+      if (err.response && err.response.data) {
+        setError(err.response.data.message || 'Invalid Employee Email or Password. Please try again.');
+      } else {
+        setError('Network error: Failed to connect to the server.');
+      }
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="relative min-h-screen bg-white text-neutral-900 flex flex-col justify-between overflow-x-hidden">
       {/* Background Teal Curved Shape */}
-      <div 
+      <div
         className="absolute top-[-218px] left-[-374px] w-[921px] h-[850px] pointer-events-none select-none opacity-95 z-0 hidden md:block"
         aria-hidden="true"
       >
@@ -60,7 +103,7 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
       {/* Main Container */}
       <main className="relative z-10 flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12 lg:py-20 flex items-center justify-center">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center w-full">
-          
+
           {/* Left Column: Hero Image (hidden on mobile, shown on desktop) */}
           <div className="lg:col-span-6 relative w-full h-[350px] sm:h-[450px] lg:h-[680px] rounded-[20px] overflow-hidden shadow-[0_15px_40px_rgba(0,0,0,0.06)] hidden md:block">
             {/* eslint-disable-next-line @next/next/no-img-element */}
