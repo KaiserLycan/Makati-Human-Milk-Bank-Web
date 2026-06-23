@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { api } from '../utils/api';
 import {
   Bell,
   Plus,
@@ -128,6 +129,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   const [currentTime, setCurrentTime] = useState('');
 
   // Main list states
+  // removing the mock 
+  /*
   const [donors, setDonors] = useState<Donor[]>([
     {
       id: 'D001',
@@ -338,7 +341,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       bloodExposure: { bloodProduct12m: 'No', needlePrick: 'No', repeatedTransfusions: 'No' }
     }
   ]);
-
+*/
+// Main list states
+  const [donors, setDonors] = useState<Donor[]>([]);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  
   // Query Filter States
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
