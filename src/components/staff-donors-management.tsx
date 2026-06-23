@@ -473,6 +473,9 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [registerTab, setRegisterTab] = useState(1); // 1: Personal/Contact, 2: Travel/Donation, 3: Medical/Habits
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
+
   // Register New Donor Form State
   const [newDonorForm, setNewDonorForm] = useState({
     name: '',
@@ -635,144 +638,104 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   };
 
   // Submit registration form
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newId = `D00${donors.length + 1}`;
-    const newDonor: Donor = {
-      id: newId,
-      name: newDonorForm.name,
-      status: 'Active',
-      dateJoined: new Date().toISOString().split('T')[0],
-      lastDonation: newDonorForm.lastDonationDate || 'N/A',
-      dob: newDonorForm.dob,
-      occupation: newDonorForm.occupation,
-      maritalStatus: newDonorForm.maritalStatus,
-      address: newDonorForm.address,
-      phone: newDonorForm.phone,
-      email: newDonorForm.email,
-      travel: newDonorForm.travel,
-      travelCountries: newDonorForm.travelCountries,
-      travelPurpose: newDonorForm.travelPurpose,
-      donationReasons: newDonorForm.donationReasons,
-      spouseSupport: newDonorForm.spouseSupport,
-      prevDonations: newDonorForm.prevDonations,
-      lastDonationDate: newDonorForm.lastDonationDate,
-      lastDonationLocation: newDonorForm.lastDonationLocation,
-      stoppedReason: newDonorForm.stoppedReason,
-      medicalHistory: {
-        tuberculosis: newDonorForm.tuberculosis,
-        hepatitisB: newDonorForm.hepatitisB,
-        mastitis: newDonorForm.mastitis,
-        syphilis: newDonorForm.syphilis,
-        herpes: newDonorForm.herpes,
-        std: newDonorForm.std,
-      },
-      habits: {
-        alcohol24h: newDonorForm.alcohol24h,
-        smoke: newDonorForm.smoke,
-        illegalDrugs: newDonorForm.illegalDrugs,
-        intravenousDrugs: newDonorForm.intravenousDrugs,
-      },
-      diet: {
-        vegetarian: newDonorForm.vegetarian,
-        multivitamins: newDonorForm.multivitamins,
-        herbalHighDose: newDonorForm.herbalHighDose,
-      },
-      bloodExposure: {
-        bloodProduct12m: newDonorForm.bloodProduct12m,
-        needlePrick: newDonorForm.needlePrick,
-        repeatedTransfusions: newDonorForm.repeatedTransfusions,
-      },
-    };
-
-    if (mode === 'applicants') {
-      const newApplicant: Applicant = {
-        id: `A00${applicants.length + 1}`,
+    try {
+      // 1. Build the exact JSON payload the backend expects
+      const donorPayload = {
         name: newDonorForm.name,
-        application_status: 'Pending',
-        dateApplied: new Date().toISOString().split('T')[0],
         email: newDonorForm.email,
-        dob: newDonorForm.dob,
-        occupation: newDonorForm.occupation,
-        maritalStatus: newDonorForm.maritalStatus,
-        address: newDonorForm.address,
         phone: newDonorForm.phone,
-        travel: newDonorForm.travel,
-        travelCountries: newDonorForm.travelCountries,
-        travelPurpose: newDonorForm.travelPurpose,
-        donationReasons: newDonorForm.donationReasons,
-        spouseSupport: newDonorForm.spouseSupport,
-        prevDonations: newDonorForm.prevDonations,
-        lastDonationDate: newDonorForm.lastDonationDate,
-        lastDonationLocation: newDonorForm.lastDonationLocation,
-        stoppedReason: newDonorForm.stoppedReason,
-        medicalHistory: {
-          tuberculosis: newDonorForm.tuberculosis,
-          hepatitisB: newDonorForm.hepatitisB,
-          mastitis: newDonorForm.mastitis,
-          syphilis: newDonorForm.syphilis,
-          herpes: newDonorForm.herpes,
-          std: newDonorForm.std,
-        },
-        habits: {
-          alcohol24h: newDonorForm.alcohol24h,
-          smoke: newDonorForm.smoke,
-          illegalDrugs: newDonorForm.illegalDrugs,
-          intravenousDrugs: newDonorForm.intravenousDrugs,
-        },
-        diet: {
-          vegetarian: newDonorForm.vegetarian,
-          multivitamins: newDonorForm.multivitamins,
-          herbalHighDose: newDonorForm.herbalHighDose,
-        },
-        bloodExposure: {
-          bloodProduct12m: newDonorForm.bloodProduct12m,
-          needlePrick: newDonorForm.needlePrick,
-          repeatedTransfusions: newDonorForm.repeatedTransfusions,
-        },
+        birth_date: newDonorForm.dob,
+        profile: {
+          personal_information: {
+            occupation: newDonorForm.occupation,
+            marital_status: newDonorForm.maritalStatus,
+            home_address: newDonorForm.address
+          },
+          traveling_information: {
+            travelled_recently: newDonorForm.travel.toLowerCase(),
+            country_visited: newDonorForm.travelCountries,
+            purpose: newDonorForm.travelPurpose
+          },
+          donation_information: {
+            reason: newDonorForm.donationReasons,
+            spouse_consent: newDonorForm.spouseSupport.toLowerCase(),
+            previously_donated: newDonorForm.prevDonations.toLowerCase(),
+            last_donation: newDonorForm.lastDonationDate || undefined,
+            place_donated: newDonorForm.lastDonationLocation,
+            reason_for_stopping: newDonorForm.stoppedReason
+          },
+          medical_information: {
+            infectious_medical_illness: {
+              tuberculosis: newDonorForm.tuberculosis.toLowerCase(),
+              hepatitis_b: newDonorForm.hepatitisB.toLowerCase(),
+              mastitis: newDonorForm.mastitis.toLowerCase(),
+              syphilis: newDonorForm.syphilis.toLowerCase(),
+              herpes: newDonorForm.herpes.toLowerCase(),
+              std: newDonorForm.std.toLowerCase()
+            },
+            substance_user_habits: {
+              consumed_alcohol: newDonorForm.alcohol24h.toLowerCase(),
+              smoke: newDonorForm.smoke.toLowerCase(),
+              illegal_drugs: newDonorForm.illegalDrugs.toLowerCase(),
+              intravenous_drug_use: newDonorForm.intravenousDrugs.toLowerCase()
+            },
+            diet_supplement_tracking: {
+              vegetarian: newDonorForm.vegetarian.toLowerCase(),
+              multivitamins: newDonorForm.multivitamins.toLowerCase(),
+              herbal_drugs: newDonorForm.herbalHighDose.toLowerCase()
+            },
+            blood_exposure_transfusion: {
+              received_blood: newDonorForm.bloodProduct12m.toLowerCase(),
+              needle_contact: newDonorForm.needlePrick.toLowerCase(),
+              repeated_blood_transfusion: newDonorForm.repeatedTransfusions.toLowerCase()
+            },
+            surgical_specialized_medical_history: {
+              hormone_control: "no", breast_surgery: "no", breast_implant: "no"
+            },
+            exposure_behavior: {
+              tattoos: "no", polygamy: "no", std: newDonorForm.std.toLowerCase()
+            }
+          }
+        }
       };
-      setApplicants([newApplicant, ...applicants]);
-    } else {
-      setDonors([newDonor, ...donors]);
+
+      const formData = new FormData();
+      formData.append("json", JSON.stringify(donorPayload));
+
+      // 2. LOGIC SWITCH: If isEditMode is true, use PUT (Update), otherwise POST (Create)
+      if (isEditMode && editTargetId) {
+        await api.put(`/api/donors/${editTargetId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        await api.post('/api/donors/register', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+
+      // 3. UI CLEANUP
+      setIsRegisterOpen(false);
+      setRegisterTab(1);
+      setIsEditMode(false);      // Reset mode
+      setEditTargetId(null);     // Clear ID
+      fetchAllDonors();          // Refresh the table with latest database data
+      
+      // Reset form
+      setNewDonorForm({
+        name: '', dob: '', occupation: '', maritalStatus: 'Single', address: '', phone: '', email: '',
+        travel: 'No', travelCountries: '', travelPurpose: '', donationReasons: '', spouseSupport: 'Yes',
+        prevDonations: 'No', lastDonationDate: '', lastDonationLocation: '', stoppedReason: '',
+        tuberculosis: 'No', hepatitisB: 'No', mastitis: 'No', syphilis: 'No', herpes: 'No', std: 'No',
+        alcohol24h: 'No', smoke: 'No', illegalDrugs: 'No', intravenousDrugs: 'No', vegetarian: 'No',
+        multivitamins: 'No', herbalHighDose: 'No', bloodProduct12m: 'No', needlePrick: 'No', repeatedTransfusions: 'No',
+      });
+    } catch (error) {
+      console.error("Operation failed:", error);
+      alert("Action failed. Check console for details.");
     }
-    setIsRegisterOpen(false);
-    // Reset form
-    setNewDonorForm({
-      name: '',
-      dob: '',
-      occupation: '',
-      maritalStatus: 'Single',
-      address: '',
-      phone: '',
-      email: '',
-      travel: 'No',
-      travelCountries: '',
-      travelPurpose: '',
-      donationReasons: '',
-      spouseSupport: 'Yes',
-      prevDonations: 'No',
-      lastDonationDate: '',
-      lastDonationLocation: '',
-      stoppedReason: '',
-      tuberculosis: 'No',
-      hepatitisB: 'No',
-      mastitis: 'No',
-      syphilis: 'No',
-      herpes: 'No',
-      std: 'No',
-      alcohol24h: 'No',
-      smoke: 'No',
-      illegalDrugs: 'No',
-      intravenousDrugs: 'No',
-      vegetarian: 'No',
-      multivitamins: 'No',
-      herbalHighDose: 'No',
-      bloodProduct12m: 'No',
-      needlePrick: 'No',
-      repeatedTransfusions: 'No',
-    });
-    setRegisterTab(1);
   };
 
   // Mock status badge color mappings
@@ -1036,7 +999,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               <div className="flex items-center gap-3">
                 <User className="size-5.5 text-brand-teal" />
                 <h3 className="text-lg font-bold text-neutral-900">
-                  {mode === 'donors' ? 'Donor Profile' : 'Applicant Profile'}
+                  {isEditMode ? 'Edit Donor Profile' : 'New Donor Registration'}
                 </h3>
               </div>
               <button
@@ -1109,17 +1072,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
                       try {
                         if (mode === 'donors') {
-                          // If it's an existing donor, toggle them between Active and Inactive
                           await api.patch(`/api/donors/toggle-status/${targetId}`);
                         } else {
-                          // If it's an applicant, approve their application!
                           await api.patch(`/api/donors/approve/${targetId}`);
                         }
                         
-                        // Instantly refresh the table from the database to show the updated status
                         fetchAllDonors(); 
-                        
-                        // Close the modal
                         setSelectedDonor(null);
                         setSelectedApplicant(null);
                       } catch (error) {
@@ -1129,25 +1087,59 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     }}
                     className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
                   >
-                    {/* Change button text based on what view we are in */}
                     {mode === 'donors' 
                       ? ((selectedDonor?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
                       : 'Approve Application'
                     }
                   </button>
 
-                  {/* BUTTON 2: REJECT APPLICANT (Only shows up in Applicant mode to satisfy GitHub issue) */}
+                  {/* NEW BUTTON: EDIT PROFILE */}
+                  <button 
+                    onClick={() => {
+                      const target = mode === 'donors' ? selectedDonor : selectedApplicant;
+                      if (!target) return;
+
+                      // Pre-fill the registration form with this person's existing data
+                      setNewDonorForm({
+                        name: target.name, dob: target.dob, occupation: target.occupation,
+                        maritalStatus: target.maritalStatus, address: target.address,
+                        phone: target.phone, email: target.email, travel: target.travel,
+                        travelCountries: target.travelCountries, travelPurpose: target.travelPurpose,
+                        donationReasons: target.donationReasons, spouseSupport: target.spouseSupport,
+                        prevDonations: target.prevDonations, lastDonationDate: target.lastDonationDate,
+                        lastDonationLocation: target.lastDonationLocation, stoppedReason: target.stoppedReason,
+                        tuberculosis: target.medicalHistory.tuberculosis, hepatitisB: target.medicalHistory.hepatitisB,
+                        mastitis: target.medicalHistory.mastitis, syphilis: target.medicalHistory.syphilis,
+                        herpes: target.medicalHistory.herpes, std: target.medicalHistory.std,
+                        alcohol24h: target.habits.alcohol24h, smoke: target.habits.smoke,
+                        illegalDrugs: target.habits.illegalDrugs, intravenousDrugs: target.habits.intravenousDrugs,
+                        vegetarian: target.diet.vegetarian, multivitamins: target.diet.multivitamins,
+                        herbalHighDose: target.diet.herbalHighDose, bloodProduct12m: target.bloodExposure.bloodProduct12m,
+                        needlePrick: target.bloodExposure.needlePrick, repeatedTransfusions: target.bloodExposure.repeatedTransfusions,
+                      });
+
+                      // Trigger Edit Mode and open the modal
+                      setIsEditMode(true);
+                      setEditTargetId(target.id);
+                      setSelectedDonor(null);
+                      setSelectedApplicant(null);
+                      setIsRegisterOpen(true);
+                    }}
+                    className="w-full py-2.5 text-xs font-bold text-brand-teal hover:text-white bg-white hover:bg-brand-teal border border-brand-teal/30 hover:border-brand-teal rounded-xl transition-all shadow-sm"
+                  >
+                    Edit Profile
+                  </button>
+
+                  {/* BUTTON 2: REJECT APPLICANT */}
                   {mode === 'applicants' && (
                     <button 
                       onClick={async () => {
                         const targetId = selectedApplicant?.id;
                         if (!targetId) return;
 
-                        // Add a browser confirmation popup so staff don't accidentally click this
                         if (!window.confirm("Are you sure you want to REJECT this application?")) return;
 
                         try {
-                          // Hit the specific reject route on your Express backend
                           await api.patch(`/api/donors/reject/${targetId}`);
                           fetchAllDonors();
                           setSelectedApplicant(null);
@@ -1167,14 +1159,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                       const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
                       if (!targetId) return;
 
-                      // Extremely important to verify before permanently deleting from the DB
                       if (!window.confirm("Are you sure you want to permanently delete this profile from the database?")) return;
 
                       try {
-                        // Tell the backend to completely drop the row from PostgreSQL
                         await api.delete(`/api/donors/${targetId}`);
-                        
-                        // Refresh the UI
                         fetchAllDonors();
                         setSelectedDonor(null);
                         setSelectedApplicant(null);
@@ -1188,6 +1176,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </button>
                 </div>
               </div>
+
+
 
 
               {/* Right Column: Main Collapsible Cards */}
