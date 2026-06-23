@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Navbar from './ui/navbar';
 import Footer from './ui/footer';
+import { api } from '../utils/api';
 
 export interface DonorApplicationProps {
   onSubmitSuccess?: (data: any) => void;
@@ -68,6 +69,7 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [isSubmitError, setIsSubmitError] = useState(false);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -80,18 +82,106 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API Submission
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // 1. Format phone number to E.164 (e.g. +639123456789)
+      let caregiverPhone = formData.phoneNumber.replace(/[^\d+]/g, '');
+      if (caregiverPhone.startsWith('0')) {
+        caregiverPhone = '+63' + caregiverPhone.slice(1);
+      } else if (/^[1-9]/.test(caregiverPhone) && !caregiverPhone.startsWith('+')) {
+        caregiverPhone = '+63' + caregiverPhone;
+      }
+
+      // 2. Helper to map Yes/No to lowercase yes/no for backend validator
+      const mapYesNo = (val: string) => {
+        const clean = val.trim().toLowerCase();
+        if (clean.startsWith('yes') || clean === 'y') return 'yes';
+        if (clean.startsWith('no') || clean === 'n') return 'no';
+        return undefined;
+      };
+
+      const registrationData = {
+        name: `${formData.firstName} ${formData.middleName ? formData.middleName + ' ' : ''}${formData.lastName}${formData.suffix ? ' ' + formData.suffix : ''}`.trim(),
+        email: formData.emailAddress,
+        phone: caregiverPhone,
+        birth_date: formData.dateOfBirth,
+        profile: {
+          personal_information: {
+            occupation: formData.occupation,
+            marital_status: formData.maritalStatus,
+            home_address: formData.homeAddress,
+          },
+          traveling_information: {
+            travelled_recently: mapYesNo(formData.travelledOutside) || 'no',
+            country_visited: formData.countriesVisited || undefined,
+            purpose: formData.purposeOfTravel || undefined,
+          },
+          donation_information: {
+            reason: formData.reasonsForDonating,
+            spouse_consent: mapYesNo(formData.spouseSupport),
+            previously_donated: mapYesNo(formData.previouslyDonated) || 'no',
+            last_donation: formData.lastDonationDate ? formData.lastDonationDate : undefined,
+            place_donated: formData.donationLocation || undefined,
+            reason_for_stopping: formData.whyStoppedDonating || undefined,
+          },
+          medical_information: {
+            infectious_medical_illness: {
+              tuberculosis: mapYesNo(formData.tuberculosis),
+              hepatitis_b: mapYesNo(formData.hepatitisB),
+              mastitis: mapYesNo(formData.mastitis),
+              syphilis: mapYesNo(formData.syphilis),
+              herpes: mapYesNo(formData.herpes),
+              std: mapYesNo(formData.std),
+            },
+            substance_user_habits: {
+              consumed_alcohol: mapYesNo(formData.alcohol24h),
+              smoke: mapYesNo(formData.smoke),
+              illegal_drugs: mapYesNo(formData.illegalDrugs),
+              intravenous_drug_use: mapYesNo(formData.intravenousDrugs),
+            },
+            diet_supplement_tracking: {
+              vegetarian: mapYesNo(formData.vegetarianDiet),
+              multivitamins: mapYesNo(formData.takeMultivitamins),
+              herbal_drugs: mapYesNo(formData.takeHerbalDrugs),
+            },
+            blood_exposure_transfusion: {
+              received_blood: mapYesNo(formData.receivedBlood),
+              needle_contact: mapYesNo(formData.accidentalNeedlePrick),
+              repeated_blood_transfusion: mapYesNo(formData.repeatedTransfusions),
+            },
+            surgical_specialized_medical_history: {
+              hormone_control: mapYesNo(formData.birthControlPills),
+              breast_surgery: mapYesNo(formData.breastSurgery),
+              breast_implant: mapYesNo(formData.breastImplant),
+            },
+            exposure_behavior: {
+              tattoos: mapYesNo(formData.tattoos),
+              polygamy: mapYesNo(formData.multiplePartners),
+              std: mapYesNo(formData.partnerDiagnosedSti),
+            },
+          },
+        },
+      };
+
+      await api.post('/api/donors/public-register', registrationData);
+
       setSubmitMessage('Your donor application has been submitted successfully! We will contact you soon.');
+      setIsSubmitError(false);
+
       if (onSubmitSuccess) {
         onSubmitSuccess(formData);
       }
-    }, 1500);
+    } catch (error: any) {
+      console.error('Error submitting donor application:', error);
+      const errorMessage = error.response?.data?.message || 'An error occurred while submitting your application. Please try again.';
+      setSubmitMessage(errorMessage);
+      setIsSubmitError(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Helper for rendering a medical history row
@@ -174,16 +264,24 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
           </div>
 
           {submitMessage ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center animate-in fade-in duration-300">
-              <h2 className="text-emerald-950 font-bold text-xl mb-2 font-sans">
-                Submission Completed
+            <div className={`border rounded-2xl p-6 text-center animate-in fade-in duration-300 ${
+              isSubmitError 
+                ? 'bg-red-50 border-red-200 text-red-800' 
+                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            }`}>
+              <h2 className={`font-bold text-xl mb-2 font-sans ${
+                isSubmitError ? 'text-red-950' : 'text-emerald-950'
+              }`}>
+                {isSubmitError ? 'Submission Failed' : 'Submission Completed'}
               </h2>
-              <p className="text-emerald-800 font-sans text-sm sm:text-base mb-6">
+              <p className="font-sans text-sm sm:text-base mb-6">
                 {submitMessage}
               </p>
               <button
                 onClick={() => setSubmitMessage(null)}
-                className="bg-brand-teal hover:bg-brand-teal-dark text-white font-sans font-semibold text-sm px-6 py-2 rounded-full transition-all"
+                className={`text-white font-sans font-semibold text-sm px-6 py-2 rounded-full transition-all ${
+                  isSubmitError ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-teal hover:bg-brand-teal-dark'
+                }`}
               >
                 Go Back
               </button>
@@ -197,9 +295,9 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                   Personal Information
                 </legend>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
                   {/* First Name */}
-                  <div className="lg:col-span-2 flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="firstName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       First Name
                     </label>
@@ -215,7 +313,7 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                     />
                   </div>
                   {/* Middle Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="middleName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       Middle Name
                     </label>
@@ -230,7 +328,7 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                     />
                   </div>
                   {/* Last Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="lastName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       Last Name
                     </label>
@@ -245,11 +343,8 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                       className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                   {/* Suffix */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="suffix" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       Suffix
                     </label>
@@ -267,6 +362,9 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                       <option value="III">III</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Date of Birth */}
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="dateOfBirth" className="text-neutral-500 font-sans text-xs font-bold uppercase">
