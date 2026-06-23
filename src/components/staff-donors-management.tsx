@@ -346,7 +346,117 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   const [donors, setDonors] = useState<Donor[]>([]);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // --- PASTE THIS NEW BLOCK HERE ---
   
+  // This function reaches out to your backend, grabs the raw database data, 
+  // and translates it so your frontend UI can read it perfectly without crashing.
+ // This function reaches out to your backend, grabs the raw database data, 
+  // and translates it so your frontend UI can read it perfectly without crashing.
+  const fetchAllDonors = async () => {
+    try {
+      setIsLoadingData(true);
+      const response = await api.get('/api/donors');
+      
+      // 1. THE HEAT-SEEKING MISSILE
+      // This logic digs into the backend response and finds the actual Array
+      let rawArray: any[] = [];
+      const payload = response.data?.data; // This is the { ... } object from your screenshot
+
+      if (Array.isArray(payload)) {
+        rawArray = payload;
+      } else if (payload && typeof payload === 'object') {
+        // Look through all the keys in the object to find the one holding the array (like 'donors' or 'results')
+        const arrayKey = Object.keys(payload).find(key => Array.isArray(payload[key]));
+        if (arrayKey) {
+          rawArray = payload[arrayKey];
+        }
+      }
+
+      // If the database is completely empty, rawArray will just be [], which is safe!
+      if (!rawArray) {
+        rawArray = []; 
+      }
+
+      // 2. THE TRANSLATOR
+      const mappedData = rawArray.map((d: any) => {
+        const profile = d.profile || {};
+        const personal = profile.personal_information || {};
+        const travelInfo = profile.traveling_information || {};
+        const donationInfo = profile.donation_information || {};
+        const medicalInfo = profile.medical_information || {};
+        
+        return {
+          id: d.dtn,
+          name: d.name,
+          status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Active' : 'Inactive'),
+          dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
+          lastDonation: donationInfo.last_donation || 'N/A',
+          dob: d.birth_date ? new Date(d.birth_date).toISOString().split('T')[0] : 'N/A',
+          occupation: personal.occupation || '',
+          maritalStatus: personal.marital_status || '',
+          address: personal.home_address || '',
+          phone: d.phone,
+          email: d.email,
+
+          travel: travelInfo.travelled_recently === 'yes' ? 'Yes' : 'No',
+          travelCountries: travelInfo.country_visited || '',
+          travelPurpose: travelInfo.purpose || '',
+          
+          donationReasons: donationInfo.reason || '',
+          spouseSupport: donationInfo.spouse_consent === 'yes' ? 'Yes' : 'No',
+          prevDonations: donationInfo.previously_donated === 'yes' ? 'Yes' : 'No',
+          lastDonationDate: donationInfo.last_donation || '',
+          lastDonationLocation: donationInfo.place_donated || '',
+          stoppedReason: donationInfo.reason_for_stopping || '',
+
+          medicalHistory: {
+            tuberculosis: medicalInfo.infectious_medical_illness?.tuberculosis === 'yes' ? 'Yes' : 'No',
+            hepatitisB: medicalInfo.infectious_medical_illness?.hepatitis_b === 'yes' ? 'Yes' : 'No',
+            mastitis: medicalInfo.infectious_medical_illness?.mastitis === 'yes' ? 'Yes' : 'No',
+            syphilis: medicalInfo.infectious_medical_illness?.syphilis === 'yes' ? 'Yes' : 'No',
+            herpes: medicalInfo.infectious_medical_illness?.herpes === 'yes' ? 'Yes' : 'No',
+            std: medicalInfo.infectious_medical_illness?.std === 'yes' ? 'Yes' : 'No',
+          },
+          habits: {
+            alcohol24h: medicalInfo.substance_user_habits?.consumed_alcohol === 'yes' ? 'Yes' : 'No',
+            smoke: medicalInfo.substance_user_habits?.smoke === 'yes' ? 'Yes' : 'No',
+            illegalDrugs: medicalInfo.substance_user_habits?.illegal_drugs === 'yes' ? 'Yes' : 'No',
+            intravenousDrugs: medicalInfo.substance_user_habits?.intravenous_drug_use === 'yes' ? 'Yes' : 'No',
+          },
+          diet: {
+            vegetarian: medicalInfo.diet_supplement_tracking?.vegetarian === 'yes' ? 'Yes' : 'No',
+            multivitamins: medicalInfo.diet_supplement_tracking?.multivitamins === 'yes' ? 'Yes' : 'No',
+            herbalHighDose: medicalInfo.diet_supplement_tracking?.herbal_drugs === 'yes' ? 'Yes' : 'No',
+          },
+          bloodExposure: {
+            bloodProduct12m: medicalInfo.blood_exposure_transfusion?.received_blood === 'yes' ? 'Yes' : 'No',
+            needlePrick: medicalInfo.blood_exposure_transfusion?.needle_contact === 'yes' ? 'Yes' : 'No',
+            repeatedTransfusions: medicalInfo.blood_exposure_transfusion?.repeated_blood_transfusion === 'yes' ? 'Yes' : 'No',
+          }
+        };
+      });
+
+      // 3. SORT AND SPLIT
+      const fetchedApplicants = mappedData.filter((d: any) => d.status === 'Pending');
+      const fetchedDonors = mappedData.filter((d: any) => d.status !== 'Pending');
+
+      setApplicants(fetchedApplicants);
+      setDonors(fetchedDonors);
+
+    } catch (error) {
+      console.error("Failed to fetch donors:", error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+  // 8. This built-in React hook tells the component: 
+  // "Hey, as soon as this page loads for the first time, run the fetchAllDonors function automatically!"
+  useEffect(() => {
+    fetchAllDonors();
+  }, []);
+  // --- END OF PASTE ---
+
   // Query Filter States
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
