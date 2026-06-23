@@ -184,10 +184,11 @@ describe('StaffSidebar Component', () => {
     });
     (storage.loadUsers as jest.Mock).mockReturnValue([]);
 
-    global.fetch = jest.fn().mockResolvedValue({
+    global.fetch = (jest.fn() as jest.MockedFunction<typeof globalThis.fetch>).mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({}),
-    });
+    } as Response);
 
     const { waitFor } = await import('@testing-library/react');
 
@@ -216,10 +217,11 @@ describe('StaffSidebar Component', () => {
     });
     (storage.loadUsers as jest.Mock).mockReturnValue([]);
 
-    global.fetch = jest.fn().mockResolvedValue({
+    global.fetch = (jest.fn() as jest.MockedFunction<typeof globalThis.fetch>).mockResolvedValue({
       ok: false,
+      status: 400,
       json: async () => ({ error: 'Session expired.' }),
-    });
+    } as Response);
 
     render(<StaffSidebar activeItem="dashboard" />);
 

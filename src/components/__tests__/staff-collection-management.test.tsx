@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import StaffCollectionManagement from '../staff-collection-management';
 import * as storage from '../../utils/storage';
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 
 // Mock next/link to prevent issues in Jest environment
 jest.mock('next/link', () => {
