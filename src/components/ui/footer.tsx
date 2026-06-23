@@ -1,5 +1,4 @@
 import React from 'react';
-import { Droplet } from 'lucide-react';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -14,9 +13,11 @@ export default function Footer() {
 
         {/* Small Logo / Branding */}
         <div className="flex items-center gap-2">
-          <div className="bg-brand-teal p-1.5 rounded-full text-white">
-            <Droplet className="size-4 fill-white" />
-          </div>
+          <img
+            src="/images/logoClear.png"
+            alt="MHMB Logo"
+            className="h-10 w-10 rounded-full object-cover"
+          />
           <span className="font-sans font-bold text-sm text-neutral-800 tracking-tight">
             MHMB
           </span>
