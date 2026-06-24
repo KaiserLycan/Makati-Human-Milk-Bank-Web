@@ -1933,7 +1933,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     className="px-6 py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all shadow-[0_4px_12px_rgba(0,105,111,0.1)] cursor-pointer"
                     data-testid="register-submit-btn"
                   >
-                    Submit Registration
+                    {isEditMode ? 'Save Changes' : 'Submit Registration'}
                   </button>
                 )}
               </div>
