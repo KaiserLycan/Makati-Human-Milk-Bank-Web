@@ -342,22 +342,22 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     }
   ]);
 */
-// Main list states
+  // Main list states
   const [donors, setDonors] = useState<Donor[]>([]);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // --- PASTE THIS NEW BLOCK HERE ---
-  
+
   // This function reaches out to your backend, grabs the raw database data, 
   // and translates it so your frontend UI can read it perfectly without crashing.
- // This function reaches out to your backend, grabs the raw database data, 
+  // This function reaches out to your backend, grabs the raw database data, 
   // and translates it so your frontend UI can read it perfectly without crashing.
   const fetchAllDonors = async () => {
     try {
       setIsLoadingData(true);
       const response = await api.get('/api/donors');
-      
+
       // 1. THE HEAT-SEEKING MISSILE
       // This logic digs into the backend response and finds the actual Array
       let rawArray: any[] = [];
@@ -375,7 +375,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
       // If the database is completely empty, rawArray will just be [], which is safe!
       if (!rawArray) {
-        rawArray = []; 
+        rawArray = [];
       }
 
       // 2. THE TRANSLATOR
@@ -385,12 +385,14 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         const travelInfo = profile.traveling_information || {};
         const donationInfo = profile.donation_information || {};
         const medicalInfo = profile.medical_information || {};
-        
+
         return {
           id: d.dtn,
           name: d.name,
           status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Active' : 'Inactive'),
+          application_status: d.application_status === 'pending' ? 'Pending' : (d.application_status === 'rejected' ? 'Rejected' : 'Approved'),
           dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
+          dateApplied: d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : (d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A'),
           lastDonation: donationInfo.last_donation || 'N/A',
           dob: d.birth_date ? new Date(d.birth_date).toISOString().split('T')[0] : 'N/A',
           occupation: personal.occupation || '',
@@ -402,7 +404,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           travel: travelInfo.travelled_recently === 'yes' ? 'Yes' : 'No',
           travelCountries: travelInfo.country_visited || '',
           travelPurpose: travelInfo.purpose || '',
-          
+
           donationReasons: donationInfo.reason || '',
           spouseSupport: donationInfo.spouse_consent === 'yes' ? 'Yes' : 'No',
           prevDonations: donationInfo.previously_donated === 'yes' ? 'Yes' : 'No',
@@ -438,8 +440,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       });
 
       // 3. SORT AND SPLIT
-      const fetchedApplicants = mappedData.filter((d: any) => d.status === 'Pending');
-      const fetchedDonors = mappedData.filter((d: any) => d.status !== 'Pending');
+      const fetchedApplicants = mappedData.filter((d: any) => d.status === 'Pending') as Applicant[];
+      const fetchedDonors = mappedData.filter((d: any) => d.status !== 'Pending') as Donor[];
 
       setApplicants(fetchedApplicants);
       setDonors(fetchedDonors);
@@ -618,7 +620,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   // Pagination bounds
   const totalItems = mode === 'donors' ? processedDonors.length : processedApplicants.length;
   const totalPages = Math.ceil(totalItems / limit) || 1;
-  const pagedItems = mode === 'donors' 
+  const pagedItems = mode === 'donors'
     ? processedDonors.slice((page - 1) * limit, page * limit)
     : processedApplicants.slice((page - 1) * limit, page * limit);
 
@@ -744,13 +746,13 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
-      
+
       {/* Sidebar Navigation */}
       <StaffSidebar activeItem={mode === 'donors' ? 'donors' : 'applicants-donors'} />
 
       {/* Main Workspace */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        
+
         {/* Header */}
         <header className="px-8 py-6 bg-white border-b border-neutral-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0">
           <div>
@@ -777,7 +779,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
         {/* Workspace Body */}
         <main className="p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
-          
+
           {/* Action and Filter Row */}
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
@@ -839,14 +841,14 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             {/* New Donor button (mainly on donors list or both) */}
             {mode === 'applicants' && (
               <button
-                  onClick={() => {
-                    setIsEditMode(false);
-                    setEditTargetId(null);
-                    setIsRegisterOpen(true);
-                  }}
-                  className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all duration-200 shrink-0 shadow-[0_4px_12px_rgba(0,105,111,0.15)] hover:shadow-lg hover:-translate-y-0.5"
-                  data-testid="new-donor-btn"
-                >
+                onClick={() => {
+                  setIsEditMode(false);
+                  setEditTargetId(null);
+                  setIsRegisterOpen(true);
+                }}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all duration-200 shrink-0 shadow-[0_4px_12px_rgba(0,105,111,0.15)] hover:shadow-lg hover:-translate-y-0.5"
+                data-testid="new-donor-btn"
+              >
                 <Plus className="size-4 stroke-[3px]" />
                 New Donor
               </button>
@@ -939,7 +941,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 <span className="text-neutral-500 font-bold">
                   Showing {(page - 1) * limit + 1} - {Math.min(page * limit, totalItems)} of {totalItems} entries
                 </span>
-                
+
                 <div className="flex items-center gap-1.5" data-testid="pagination-nav">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -949,16 +951,15 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   >
                     <ChevronLeft className="size-4" />
                   </button>
-                  
+
                   {Array.from({ length: totalPages }).map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => setPage(idx + 1)}
-                      className={`size-8 font-bold border rounded-xl transition-all cursor-pointer ${
-                        page === idx + 1
-                          ? 'bg-brand-teal border-brand-teal text-white shadow-sm'
-                          : 'border-neutral-200 hover:bg-white text-neutral-600'
-                      }`}
+                      className={`size-8 font-bold border rounded-xl transition-all cursor-pointer ${page === idx + 1
+                        ? 'bg-brand-teal border-brand-teal text-white shadow-sm'
+                        : 'border-neutral-200 hover:bg-white text-neutral-600'
+                        }`}
                       data-testid={`page-btn-${idx + 1}`}
                     >
                       {idx + 1}
@@ -985,7 +986,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       {(selectedDonor || selectedApplicant) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="detail-modal">
           <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200 flex flex-col">
-            
+
             {/* Modal Sticky Header */}
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
@@ -1006,7 +1007,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
             {/* Modal Body Columns */}
             <div className="p-8 flex flex-col md:flex-row gap-8 overflow-y-auto">
-              
+
               {/* Left Column: Side Profile */}
               <div className="w-full md:w-72 shrink-0 space-y-6">
                 <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col items-center gap-5 text-center shadow-sm">
@@ -1014,7 +1015,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   <div className="size-36 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
                     {(selectedDonor || selectedApplicant)?.name.split(' ').map((n) => n[0]).join('')}
                   </div>
-                  
+
                   {/* Minimal metadata info */}
                   <div className="space-y-1.5 w-full">
                     <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-profile-name">
@@ -1025,8 +1026,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     </p>
                     <div className="pt-2">
                       <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(
-                        mode === 'donors' 
-                          ? (selectedDonor as Donor)?.status 
+                        mode === 'donors'
+                          ? (selectedDonor as Donor)?.status
                           : (selectedApplicant as Applicant)?.application_status
                       )}`} data-testid="modal-profile-status">
                         {mode === 'donors' ? (selectedDonor as Donor)?.status : (selectedApplicant as Applicant)?.application_status}
@@ -1035,7 +1036,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </div>
 
                   <hr className="w-full border-neutral-100" />
-                  
+
                   <div className="w-full text-left space-y-2 text-xs">
                     <p className="text-neutral-500 font-bold font-sans uppercase text-[9px] tracking-widest">Profile Stats</p>
                     <p className="flex justify-between">
@@ -1055,9 +1056,9 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
                 {/* Profile actions */}
                 <div className="space-y-3.5">
-                  
+
                   {/* BUTTON 1: TOGGLE STATUS OR APPROVE */}
-                  <button 
+                  <button
                     onClick={async () => {
                       const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
                       if (!targetId) return; // Safety check
@@ -1068,8 +1069,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                         } else {
                           await api.patch(`/api/donors/approve/${targetId}`);
                         }
-                        
-                        fetchAllDonors(); 
+
+                        fetchAllDonors();
                         setSelectedDonor(null);
                         setSelectedApplicant(null);
                       } catch (error) {
@@ -1079,14 +1080,14 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     }}
                     className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
                   >
-                    {mode === 'donors' 
+                    {mode === 'donors'
                       ? ((selectedDonor?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
                       : 'Approve Application'
                     }
                   </button>
 
                   {/* NEW BUTTON: EDIT PROFILE */}
-                  <button 
+                  <button
                     onClick={() => {
                       const target = mode === 'donors' ? selectedDonor : selectedApplicant;
                       if (!target) return;
@@ -1124,7 +1125,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
                   {/* BUTTON 2: REJECT APPLICANT */}
                   {mode === 'applicants' && (
-                    <button 
+                    <button
                       onClick={async () => {
                         const targetId = selectedApplicant?.id;
                         if (!targetId) return;
@@ -1146,7 +1147,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   )}
 
                   {/* BUTTON 3: PERMANENTLY DELETE */}
-                  <button 
+                  <button
                     onClick={async () => {
                       const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
                       if (!targetId) return;
@@ -1174,7 +1175,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
               {/* Right Column: Main Collapsible Cards */}
               <div className="flex-1 space-y-6">
-                
+
                 {/* 1. Personal Information */}
                 <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm" data-testid="profile-section-personal">
                   <h4 className="text-sm font-bold text-neutral-900 border-b border-neutral-100 pb-2 uppercase tracking-wide">
@@ -1284,7 +1285,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   <h4 className="text-sm font-bold text-neutral-900 border-b border-neutral-100 pb-2 uppercase tracking-wide">
                     Medical Checklists & Screening
                   </h4>
-                  
+
                   <div className="space-y-6">
                     {/* table 1: Illnesses */}
                     <div className="border border-neutral-100 rounded-xl overflow-hidden shadow-sm">
@@ -1420,12 +1421,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       {/* REGISTRATION MODAL (New Donor Tabbed Form) */}
       {isRegisterOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="register-modal">
-          <form 
-            onSubmit={handleRegisterSubmit} 
+          <form
+            onSubmit={handleRegisterSubmit}
             data-testid="register-form"
             className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200 flex flex-col"
           >
-            
+
             {/* Modal Header */}
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
@@ -1454,11 +1455,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   key={item.tab}
                   type="button"
                   onClick={() => setRegisterTab(item.tab)}
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                    registerTab === item.tab
-                      ? 'bg-brand-teal text-white shadow-sm'
-                      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
-                  }`}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${registerTab === item.tab
+                    ? 'bg-brand-teal text-white shadow-sm'
+                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+                    }`}
                   data-testid={`register-tab-${item.tab}`}
                 >
                   {item.label}
@@ -1468,11 +1468,11 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
             {/* Modal Form Body */}
             <div className="p-8 flex-1 overflow-y-auto space-y-6">
-              
+
               {/* TAB 1: Personal & Contact */}
               {registerTab === 1 && (
                 <div className="space-y-6" data-testid="register-pane-1">
-                  
+
                   {/* Personal details fields */}
                   <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm">
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
@@ -1583,7 +1583,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               {/* TAB 2: Travel & Donation */}
               {registerTab === 2 && (
                 <div className="space-y-6" data-testid="register-pane-2">
-                  
+
                   {/* Travel details fields */}
                   <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm">
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
@@ -1607,7 +1607,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                           ))}
                         </div>
                       </div>
-                      
+
                       {newDonorForm.travel === 'Yes' && (
                         <>
                           <div className="space-y-1.5">
@@ -1734,7 +1734,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               {/* TAB 3: Medical History & Habits */}
               {registerTab === 3 && (
                 <div className="space-y-6" data-testid="register-pane-3">
-                  
+
                   {/* Medical Checklists Form */}
                   <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-5 shadow-sm text-xs font-bold">
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
@@ -1896,7 +1896,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </button>
                 )}
               </div>
-              
+
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -1905,7 +1905,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 >
                   Cancel
                 </button>
-                
+
                 {registerTab < 3 ? (
                   <button
                     type="button"
