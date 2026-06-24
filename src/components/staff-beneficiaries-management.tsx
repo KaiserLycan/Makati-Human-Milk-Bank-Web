@@ -387,8 +387,8 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement),
         address: newBeneficiaryForm.address,
         profile: {
-          prescription_details: null,
-          clinical_abstract: null,
+          prescription_details: "",
+          clinical_abstract: "",
         },
       };
 
