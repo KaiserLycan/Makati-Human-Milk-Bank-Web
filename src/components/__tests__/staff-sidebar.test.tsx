@@ -83,12 +83,13 @@ describe('StaffSidebar Component', () => {
     expect(screen.getByTestId('nav-audits')).toBeInTheDocument();
   });
 
-  it('opens staff profile modal and allows role toggling', () => {
+  it('opens staff profile modal and displays details', () => {
     (storage.loadProfile as jest.Mock).mockReturnValue({
       name: 'Alice May Miller',
       id: '2024102114',
       email: 'staff@mhmb.gov',
       role: 'manager',
+      phone: '1234567890',
     });
     (storage.loadUsers as jest.Mock).mockReturnValue([]);
 
@@ -101,18 +102,9 @@ describe('StaffSidebar Component', () => {
     // Profile modal should be in the document
     expect(screen.getByTestId('profile-modal')).toBeInTheDocument();
     expect(screen.getByTestId('profile-modal-name')).toHaveTextContent('Alice May Miller');
-
-    // Change role from manager to staff
-    const roleSelector = screen.getByTestId('role-selector');
-    fireEvent.change(roleSelector, { target: { value: 'staff' } });
-
-    // Profile should save and trigger a reload
-    expect(storage.saveProfile).toHaveBeenCalledWith(
-      expect.objectContaining({
-        role: 'staff',
-      })
-    );
-    expect(reloadWindow).toHaveBeenCalled();
+    expect(screen.getByText('Profile')).toBeInTheDocument();
+    expect(screen.getByText('1234567890')).toBeInTheDocument();
+    expect(screen.queryByTestId('role-selector')).not.toBeInTheDocument();
   });
 
   it('opens logout confirmation modal when logout button is clicked', () => {

@@ -11,10 +11,24 @@ jest.mock('next/link', () => {
   return MockLink;
 });
 
-// Mock window.print to prevent errors in jsdom environment
+// Mock window.print and URL methods to prevent errors in jsdom environment
 beforeAll(() => {
   window.print = jest.fn();
+  window.URL.createObjectURL = jest.fn(() => 'mock-url');
+  window.URL.revokeObjectURL = jest.fn();
 });
+
+// Mock api utility to prevent actual network calls in tests and avoid act warnings
+jest.mock('../../utils/api', () => ({
+  api: {
+    get: jest.fn((url) => {
+      if (url.includes('/export')) {
+        return Promise.resolve({ data: new Blob() });
+      }
+      return new Promise(() => {}); // keeps data fetching pending to avoid act warnings
+    }),
+  },
+}));
 
 describe('StaffReports Component', () => {
   it('renders sidebar, document outline, toolbar, and the first PDF page canvas', () => {
@@ -144,5 +158,27 @@ describe('StaffReports Component', () => {
     expect(window.print).toHaveBeenCalled();
 
     jest.useRealTimers();
+  });
+
+  it('allows switching report type and range, updating layout and filename', () => {
+    render(<StaffReports />);
+
+    // Selector for Report Type
+    const select = screen.getByTestId('report-type-select');
+    expect(select).toHaveValue('summary');
+
+    // Switch to collection report
+    fireEvent.change(select, { target: { value: 'collection' } });
+    expect(select).toHaveValue('collection');
+
+    // Expect the file name toolbar text to change
+    expect(screen.getByText('mhmb-collection-report-month.pdf')).toBeInTheDocument();
+
+    // Switch range to week
+    const weekBtn = screen.getByTestId('range-btn-week');
+    fireEvent.click(weekBtn);
+
+    // Expect file name to change
+    expect(screen.getByText('mhmb-collection-report-week.pdf')).toBeInTheDocument();
   });
 });

@@ -1,6 +1,8 @@
+/// <reference types="jest" />
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import DonorApplication from '../donor-application';
+import { api } from '../../utils/api';
 
 // Mock next/link to prevent issues in Jest environment
 jest.mock('next/link', () => {
@@ -8,6 +10,13 @@ jest.mock('next/link', () => {
     return <a href={href}>{children}</a>;
   };
 });
+
+// Mock api utility
+jest.mock('../../utils/api', () => ({
+  api: {
+    post: jest.fn(() => Promise.resolve({ data: { success: true } })),
+  },
+}));
 
 describe('DonorApplication Component', () => {
   const mockOnSubmitSuccess = jest.fn();
@@ -92,12 +101,29 @@ describe('DonorApplication Component', () => {
     // Assert it shows submittting state
     expect(screen.getByText(/submitting/i)).toBeInTheDocument();
 
-    // Wait for mock API response (1500ms in component, Jest timeout handles this)
+    // Wait for mock API response
     await waitFor(
       () => {
         expect(screen.getByText(/submitted successfully/i)).toBeInTheDocument();
       },
       { timeout: 2000 }
+    );
+
+    // Verify API is called with normalized data
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/donors/public-register',
+      expect.objectContaining({
+        name: 'Maria Lopez',
+        email: 'maria@example.com',
+        phone: '+639123456789',
+        birth_date: '1995-05-15',
+        profile: expect.objectContaining({
+          personal_information: expect.objectContaining({
+            home_address: 'Makati City',
+          }),
+        }),
+      })
     );
 
     expect(mockOnSubmitSuccess).toHaveBeenCalledTimes(1);

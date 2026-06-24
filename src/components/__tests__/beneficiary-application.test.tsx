@@ -1,6 +1,8 @@
+/// <reference types="jest" />
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BeneficiaryApplication from '../beneficiary-application';
+import { api } from '../../utils/api';
 
 // Mock next/link to prevent issues in Jest environment
 jest.mock('next/link', () => {
@@ -8,6 +10,13 @@ jest.mock('next/link', () => {
     return <a href={href}>{children}</a>;
   };
 });
+
+// Mock api utility
+jest.mock('../../utils/api', () => ({
+  api: {
+    post: jest.fn(() => Promise.resolve({ data: { success: true } })),
+  },
+}));
 
 describe('BeneficiaryApplication Component', () => {
   const mockOnSubmitSuccess = jest.fn();
@@ -31,6 +40,9 @@ describe('BeneficiaryApplication Component', () => {
     // Verify parent inputs
     expect(screen.getByPlaceholderText('Phone Number')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Email')).toBeInTheDocument();
+
+    // Verify suffix selectors
+    expect(screen.getAllByText('Suffix').length).toBe(2);
 
     // Verify file upload zones
     expect(screen.getByText('Prescription Details')).toBeInTheDocument();
@@ -134,6 +146,28 @@ describe('BeneficiaryApplication Component', () => {
       },
       { timeout: 2000 }
     );
+
+    // Verify API is called with normalized data
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post).toHaveBeenCalledWith(
+      '/api/beneficiaries/public-register',
+      expect.any(FormData)
+    );
+
+    const calledFormData = (api.post as any).mock.calls[0][1] as FormData;
+    const parsedData = JSON.parse(calledFormData.get('data') as string);
+    expect(parsedData).toEqual({
+      name: 'Leo Garcia',
+      caregiver: 'Julia Garcia',
+      caregiver_email: 'julia@gmail.com',
+      caregiver_phone: '+639876543210',
+      birth_date: '2026-05-10',
+      weight_kg: 2.8,
+      feeding_requirement_ml: 200,
+      profile: {},
+    });
+    expect(calledFormData.get('prescription_details')).toBeDefined();
+    expect(calledFormData.get('clinical_abstract')).toBeDefined();
 
     expect(mockOnSubmitSuccess).toHaveBeenCalledTimes(1);
     expect(mockOnSubmitSuccess).toHaveBeenCalledWith(

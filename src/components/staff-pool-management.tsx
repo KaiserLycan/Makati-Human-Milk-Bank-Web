@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Bell,
@@ -11,38 +11,166 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
+  Info,
+  Edit2,
+  Trash2,
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import StaffSidebar from './ui/staff-sidebar';
-import {
-  loadPools,
-  savePools,
-  loadInventory,
-  saveInventory,
-  loadAudits,
-  saveAudits,
-  loadProfile,
-  PooledMilkBatch,
-  MilkInventoryItem,
-  AuditLog,
-} from '../utils/storage';
+import { api } from '../utils/api';
+
+const CustomDropdown = ({ 
+  value, 
+  onChange, 
+  options, 
+  icon: Icon, 
+  triggerClassName, 
+  dropdownClassName,
+  optionClassName,
+  disabled 
+}: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find((o: any) => o.value === value) || options[0];
+
+  return (
+    <div className="relative" ref={containerRef}>
+      {Icon && <Icon className="size-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />}
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`${triggerClassName} flex items-center justify-between gap-2 select-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span>{selectedOption?.label || value}</span>
+        <ChevronDown className={`size-3.5 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {isOpen && (
+        <div className={`absolute top-full mt-1.5 w-full bg-white border border-neutral-200 rounded-xl shadow-lg z-[60] overflow-hidden min-w-[140px] left-0 ${dropdownClassName || ''}`}>
+          {options.map((option: any) => (
+            <div
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`px-3.5 py-2.5 text-xs font-bold cursor-pointer transition-colors ${value === option.value ? 'bg-brand-teal/10 text-brand-teal' : 'text-neutral-600 hover:bg-slate-50'} ${optionClassName || ''}`}
+            >
+              {option.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export interface RawMilkItem {
+  ctn: number;
+  volume_ml: number;
+  expiration_date: string;
+}
+
+export interface PoolMilkBatch {
+  pid: number;
+  pooled_date: string;
+  pooled_by_user?: {
+    user_id: string;
+    name: string;
+  };
+  raw_milk: RawMilkItem[];
+  expiration_date: string;
+  expected_volume_ml: number;
+  actual_volume_ml: number;
+  remaining_volume_ml: number;
+  milk_status: 'good' | 'contaminated' | 'discarded' | 'expired';
+  remarks: string | null;
+}
 
 export default function StaffPoolManagement() {
   const [currentTime, setCurrentTime] = useState('');
-  const [pools, setPools] = useState<PooledMilkBatch[]>([]);
-  const [selectedPool, setSelectedPool] = useState<PooledMilkBatch | null>(null);
+  const [pools, setPools] = useState<PoolMilkBatch[]>([]);
+  const { user } = useAuth();
+
+  // Selection & Modal State
+  const [selectedPool, setSelectedPool] = useState<PoolMilkBatch | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // Edit Form State
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formData, setFormData] = useState<Partial<PoolMilkBatch>>({});
+  const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pasteurize Form State
+  const [isPasteurizeOpen, setIsPasteurizeOpen] = useState(false);
+  const [pasteurizeData, setPasteurizeData] = useState<any>({});
+  const [pasteurizeError, setPasteurizeError] = useState('');
+  const [isPasteurizing, setIsPasteurizing] = useState(false);
 
   // Filters state
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy] = useState('id');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchPools = async () => {
+    setIsLoading(true);
+    try {
+      let mappedSortBy = sortBy;
+      if (sortBy === 'id') mappedSortBy = 'pid';
+      if (sortBy === 'datePooled') mappedSortBy = 'pooled_date';
+      if (sortBy === 'actualVolume') mappedSortBy = 'actual_volume_ml';
+
+      const params: any = {
+        page,
+        limit,
+        sortBy: mappedSortBy,
+        sortOrder: sortOrder,
+      };
+
+      if (search.trim()) {
+        params.search = search.trim();
+      }
+
+      if (statusFilter !== 'All') {
+        params.milk_status = statusFilter.toLowerCase();
+      }
+
+      const res = await api.get('/api/pooling', { params });
+      if (res.data && res.data.data) {
+        setPools(res.data.data.data);
+        setTotalItems(res.data.data.meta.total);
+        setTotalPages(res.data.data.meta.totalPages);
+      }
+    } catch (error) {
+      console.error('Failed to load pools:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setPools(loadPools());
-  }, []);
+    fetchPools();
+  }, [page, limit, sortBy, sortOrder, statusFilter, search]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -80,118 +208,120 @@ export default function StaffPoolManagement() {
     }
   };
 
-  // Filter & Sort Logic
-  const getProcessedPools = () => {
-    let result = [...pools];
-
-    // Search filter
-    if (search.trim() !== '') {
-      result = result.filter(
-        (p) =>
-          p.id.toLowerCase().includes(search.toLowerCase()) ||
-          p.sourceIds.some((id) => id.toLowerCase().includes(search.toLowerCase()))
-      );
-    }
-
-    // Status filter
-    if (statusFilter !== 'All') {
-      result = result.filter((p) => p.status === statusFilter);
-    }
-
-    // Sorting
-    result.sort((a, b) => {
-      let aVal = '';
-      let bVal = '';
-
-      if (sortBy === 'datePooled') {
-        aVal = a.datePooled;
-        bVal = b.datePooled;
-      } else if (sortBy === 'actualVolume') {
-        const diff = a.actualVolume - b.actualVolume;
-        return sortOrder === 'asc' ? diff : -diff;
-      } else {
-        aVal = a.id;
-        bVal = b.id;
+  const handleUpdateMilkStatus = async (pid: number, newStatus: string) => {
+    setIsUpdatingStatus(true);
+    try {
+      await api.patch(`/api/pooling/${pid}/milk-status`, { milk_status: newStatus });
+      fetchPools();
+      if (selectedPool && selectedPool.pid === pid) {
+        setSelectedPool({ ...selectedPool, milk_status: newStatus as any });
       }
-
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  };
-
-  const processed = getProcessedPools();
-  const totalItems = processed.length;
-  const totalPages = Math.ceil(totalItems / limit) || 1;
-  const pagedItems = processed.slice((page - 1) * limit, page * limit);
-
-  // Pasteurize Batch
-  const handlePasteurize = (poolId: string) => {
-    const inventory = loadInventory();
-    const profile = loadProfile();
-
-    // Find the batch
-    const batch = pools.find((p) => p.id === poolId);
-    if (!batch || batch.status !== 'Pooled') return;
-
-    // Update status
-    const updatedPools = pools.map((p) => {
-      if (p.id === poolId) {
-        return { ...p, status: 'Pasteurized' as const };
-      }
-      return p;
-    });
-
-    // Create new inventory item
-    const newInvId = `INV00${inventory.length + 1}`;
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    // Expiration date (180 days from now)
-    const expDate = new Date();
-    expDate.setDate(expDate.getDate() + 180);
-    const expDateStr = expDate.toISOString().split('T')[0];
-
-    const newInventoryItem: MilkInventoryItem = {
-      id: newInvId,
-      sourceBatchId: poolId,
-      volume: batch.actualVolume,
-      datePasteurized: todayStr,
-      expirationDate: expDateStr,
-      status: 'Available',
-    };
-
-    // Audit log
-    const audits = loadAudits();
-    const newAudit: AuditLog = {
-      id: `AUD00${audits.length + 1}`,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      user: profile.name,
-      action: 'Pasteurized Pool Batch',
-      details: `Pasteurized batch ${poolId} and added item ${newInvId} to milk inventory`,
-    };
-
-    savePools(updatedPools);
-    saveInventory([newInventoryItem, ...inventory]);
-    saveAudits([newAudit, ...audits]);
-
-    setPools(updatedPools);
-    if (selectedPool && selectedPool.id === poolId) {
-      setSelectedPool({ ...selectedPool, status: 'Pasteurized' });
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to update milk status');
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const handleDeletePool = async () => {
+    if (!selectedPool) return;
+    if (confirm('Are you sure you want to delete this milk pool? This action cannot be undone.')) {
+      try {
+        await api.delete(`/api/pooling/${selectedPool.pid}`);
+        setSelectedPool(null);
+        fetchPools();
+      } catch (err: any) {
+        alert(err.response?.data?.message || 'Failed to delete milk pool.');
+      }
+    }
+  };
+
+  const handleOpenEditForm = () => {
+    if (!selectedPool) return;
+    setFormData({
+      ...selectedPool,
+    });
+    setFormError('');
+    setIsFormOpen(true);
+    setSelectedPool(null);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      setFormError('Authentication required to perform this action.');
+      return;
+    }
+    setIsSubmitting(true);
+    setFormError('');
+
+    try {
+      const payload: any = {
+        actual_volume_ml: Number(formData.actual_volume_ml),
+        remarks: formData.remarks || '',
+      };
+
+      await api.put(`/api/pooling/${formData.pid}`, payload);
+      setIsFormOpen(false);
+      fetchPools();
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || err.message || 'An error occurred.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenPasteurizeForm = () => {
+    if (!selectedPool) return;
+    setPasteurizeData({
+      pid: selectedPool.pid,
+      bottle_count: '',
+      volume_per_bottle: '',
+      bottle_type: 'ameda',
+      pasteurization_date: new Date().toISOString().substring(0, 10),
+    });
+    setPasteurizeError('');
+    setIsPasteurizeOpen(true);
+    setSelectedPool(null);
+  };
+
+  const handlePasteurizeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsPasteurizing(true);
+    setPasteurizeError('');
+
+    try {
+      await api.post('/api/pasteurization', {
+        pid: Number(pasteurizeData.pid),
+        bottle_count: Number(pasteurizeData.bottle_count),
+        volume_per_bottle: Number(pasteurizeData.volume_per_bottle),
+        bottle_type: pasteurizeData.bottle_type,
+        pasteurization_date: pasteurizeData.pasteurization_date,
+      });
+      setIsPasteurizeOpen(false);
+      fetchPools();
+    } catch (err: any) {
+      setPasteurizeError(err.response?.data?.message || err.message || 'Failed to create pasteurization batch.');
+    } finally {
+      setIsPasteurizing(false);
+    }
+  };
+
+  const getMilkStatusBadge = (status: string | undefined) => {
     switch (status) {
-      case 'Pooled':
-        return 'bg-blue-50 text-blue-700 border-blue-100';
-      case 'Pasteurized':
+      case 'good':
         return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      case 'contaminated':
+      case 'expired':
+        return 'bg-red-50 text-red-700 border-red-100';
+      case 'discarded':
+        return 'bg-neutral-50 text-neutral-600 border-neutral-100';
       default:
         return 'bg-neutral-50 text-neutral-600 border-neutral-100';
     }
   };
+
+  const pagedItems = pools;
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
@@ -229,7 +359,7 @@ export default function StaffPoolManagement() {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
                 <input
                   type="text"
-                  placeholder="Search batch ID or source collection..."
+                  placeholder="Search PID..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 text-sm font-medium rounded-xl border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all placeholder:text-neutral-400"
@@ -238,19 +368,19 @@ export default function StaffPoolManagement() {
               </div>
 
               {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="size-4 text-neutral-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-3.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
-                  data-testid="status-select"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Pooled">Pooled</option>
-                  <option value="Pasteurized">Pasteurized</option>
-                </select>
-              </div>
+              <CustomDropdown
+                value={statusFilter}
+                onChange={setStatusFilter}
+                icon={SlidersHorizontal}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[150px]"
+                options={[
+                  { value: 'All', label: 'All Statuses' },
+                  { value: 'Good', label: 'Good' },
+                  { value: 'Contaminated', label: 'Contaminated' },
+                  { value: 'Expired', label: 'Expired' },
+                  { value: 'Discarded', label: 'Discarded' }
+                ]}
+              />
 
               {/* Limit Selector */}
               <div className="flex items-center gap-2">
@@ -275,65 +405,70 @@ export default function StaffPoolManagement() {
               <table className="w-full text-left border-collapse" data-testid="pools-table">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('id')} data-testid="th-id">
-                      Batch ID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('id')} data-testid="th-id">
+                      PID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('datePooled')} data-testid="th-date">
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('datePooled')} data-testid="th-date">
                       Date Pooled {sortBy === 'datePooled' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4">Source Collections</th>
-                    <th className="px-6 py-4 text-right">Expected Vol</th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-right" onClick={() => handleSort('actualVolume')} data-testid="th-volume">
+                    <th className="px-6 py-4 text-left">Expected Vol</th>
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('actualVolume')} data-testid="th-volume">
                       Actual Vol {sortBy === 'actualVolume' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
+                    <th className="px-6 py-4 text-left">Expiration Date</th>
                     <th className="px-6 py-4 text-center">Status</th>
-                    <th className="px-6 py-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {pagedItems.map((item) => (
+                  {isLoading ? (
+                    [...Array(limit || 5)].map((_, i) => (
+                      <tr key={`skel-${i}`} className="animate-pulse pointer-events-none">
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
+                        <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
+                        <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-16 mx-auto"></div></td>
+                      </tr>
+                    ))
+                  ) : pagedItems.map((item) => (
                     <tr
-                      key={item.id}
-                      className="hover:bg-slate-50/70 active:bg-slate-100/50 transition-colors duration-150"
-                      data-testid={`row-${item.id}`}
+                      key={item.pid}
+                      className="hover:bg-slate-50/70 active:bg-slate-100/50 transition-colors duration-150 cursor-pointer"
+                      onClick={() => setSelectedPool(item)}
+                      data-testid={`row-${item.pid}`}
                     >
-                      <td
-                        className="px-6 py-4.5 font-bold text-neutral-900 cursor-pointer hover:text-brand-teal"
-                        onClick={() => setSelectedPool(item)}
-                      >
-                        {item.id}
+                      <td className="px-6 py-4.5 font-bold text-neutral-900 text-left">
+                        {item.pid}
                       </td>
-                      <td className="px-6 py-4.5 text-neutral-500">{item.datePooled}</td>
-                      <td className="px-6 py-4.5 font-medium text-neutral-600">
-                        {item.sourceIds.join(', ')}
+                      <td className="px-6 py-4.5 text-neutral-500 text-left">
+                        {item.pooled_date ? new Date(item.pooled_date).toLocaleDateString() : 'N/A'}
                       </td>
-                      <td className="px-6 py-4.5 text-right text-neutral-500">{item.expectedVolume} mL</td>
-                      <td className="px-6 py-4.5 text-right text-neutral-900 font-bold">{item.actualVolume} mL</td>
+                      <td className="px-6 py-4.5 text-left text-neutral-500">{item.expected_volume_ml} mL</td>
+                      <td className="px-6 py-4.5 text-left text-neutral-900 font-bold">{item.actual_volume_ml} mL</td>
+                      <td className="px-6 py-4.5 text-neutral-500 text-left">
+                        {item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'}
+                      </td>
                       <td className="px-6 py-4.5 text-center">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(item.status)}`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4.5 text-center" onClick={(e) => e.stopPropagation()}>
-                        {item.status === 'Pooled' ? (
-                          <button
-                            onClick={() => handlePasteurize(item.id)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-lg transition-all shadow-[0_2px_6px_rgba(0,105,111,0.1)] active:scale-95 cursor-pointer"
-                            data-testid={`pasteurize-btn-${item.id}`}
-                          >
-                            <Sparkles className="size-3" />
-                            Pasteurize
-                          </button>
-                        ) : (
-                          <span className="text-[10px] font-bold text-neutral-400">Processed</span>
-                        )}
+                        <div className="flex flex-col items-center gap-1 justify-center">
+                          {!(item.milk_status === 'good' && Number(item.remaining_volume_ml) === 0) && (
+                            <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getMilkStatusBadge(item.milk_status)}`}>
+                              {item.milk_status}
+                            </span>
+                          )}
+                          {Number(item.remaining_volume_ml) === 0 && (
+                            <span className="px-2.5 py-1 text-[10px] font-bold border rounded-full uppercase tracking-wider bg-indigo-50 text-indigo-700 border-indigo-100">
+                              Processed
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
 
-                  {pagedItems.length === 0 && (
+                  {!isLoading && pagedItems.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-12 text-neutral-400">
+                      <td colSpan={6} className="text-center py-12 text-neutral-400">
                         No pooled batches found matching current criteria.
                       </td>
                     </tr>
@@ -375,79 +510,355 @@ export default function StaffPoolManagement() {
       {/* BATCH DETAILS MODAL */}
       {selectedPool && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4" data-testid="detail-modal">
-          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
-            <div className="bg-white border-b border-neutral-200 px-6 py-4.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Combine className="size-5 text-brand-teal" />
-                <h3 className="text-lg font-bold text-neutral-900">Pooled Batch Details</h3>
-              </div>
+          <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50">
+              <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
+                <Combine className="size-6 text-brand-teal" />
+                Pooled Batch Details
+              </h3>
               <button
                 onClick={() => setSelectedPool(null)}
-                className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all"
+                className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-full transition-colors"
                 data-testid="close-detail-modal-btn"
               >
                 <X className="size-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="size-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-brand-teal">
-                  <Combine className="size-8" />
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Contextual Processing Alert */}
+              {Number(selectedPool.remaining_volume_ml) === 0 ? (
+                <div className="p-4 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-2xl flex items-start gap-3" data-testid="pool-processed-alert">
+                  <Info className="size-5 shrink-0" />
+                  <div>
+                    <p className="font-bold">Completely Processed</p>
+                    <p className="mt-0.5 opacity-90">This milk pool is completely processed and all actual volume is bottled.</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-batch-id">
-                    Batch: {selectedPool.id}
-                  </h4>
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                    Date Pooled: <span className="text-neutral-900" data-testid="modal-date">{selectedPool.datePooled}</span>
-                  </p>
+              ) : (
+                <div className="p-4 bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold rounded-2xl flex items-start gap-3" data-testid="pool-processed-alert">
+                  <Info className="size-5 shrink-0" />
+                  <div>
+                    <p className="font-bold">Partially Processed</p>
+                    <p className="mt-0.5 opacity-90">This milk pool is partially processed with {selectedPool.remaining_volume_ml} mL left to be pasteurized out of {selectedPool.actual_volume_ml} mL.</p>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <hr className="border-neutral-100" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column: Details */}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">PID</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-batch-id">{selectedPool.pid}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Date Pooled</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-date">
+                        {selectedPool.pooled_date ? new Date(selectedPool.pooled_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="space-y-3.5 text-xs">
-                <div className="flex justify-between items-start">
-                  <span className="text-neutral-400 font-semibold">Source Collections:</span>
-                  <span className="font-bold text-neutral-800 text-right max-w-[200px]" data-testid="modal-sources">
-                    {selectedPool.sourceIds.join(', ')}
-                  </span>
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Expected Volume</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-expected">{selectedPool.expected_volume_ml} mL</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Actual Volume</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-actual">{selectedPool.actual_volume_ml} mL</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Remaining Volume</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedPool.remaining_volume_ml} mL</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Expiration Date</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedPool.expiration_date ? new Date(selectedPool.expiration_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Pooled By</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedPool.pooled_by_user?.name || 'Unknown'}</div>
+                    </div>
+                  </div>
+
+                  {selectedPool.remarks && (
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Remarks</label>
+                      <div className="text-sm font-bold text-neutral-800 break-words">{selectedPool.remarks}</div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Expected Volume:</span>
-                  <span className="font-bold text-neutral-800" data-testid="modal-expected">{selectedPool.expectedVolume} mL</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Actual Volume:</span>
-                  <span className="font-bold text-neutral-800" data-testid="modal-actual">{selectedPool.actualVolume} mL</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Status:</span>
-                  <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(selectedPool.status)}`}>
-                    {selectedPool.status}
-                  </span>
+
+                {/* Right Column: Source Collections */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Milk Status</label>
+                    <div className="relative inline-block w-[140px]">
+                      <CustomDropdown
+                        disabled={isUpdatingStatus || Number(selectedPool.remaining_volume_ml) === 0}
+                        triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getMilkStatusBadge(selectedPool.milk_status)}`}
+                        dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
+                        optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
+                        value={selectedPool.milk_status}
+                        onChange={(val: string) => handleUpdateMilkStatus(selectedPool.pid, val)}
+                        options={[
+                          { value: 'good', label: 'Good' },
+                          { value: 'contaminated', label: 'Contaminated' },
+                          { value: 'discarded', label: 'Discarded' },
+                          { value: 'expired', label: 'Expired' }
+                        ]}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Source Collections</label>
+                    <div className="bg-slate-50 border border-neutral-100 rounded-2xl overflow-hidden shadow-inner max-h-[350px] overflow-y-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-neutral-100/50 text-[10px] font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-150 sticky top-0 z-10 select-none">
+                            <th className="px-4 py-2.5">CTN</th>
+                            <th className="px-4 py-2.5 text-right">Volume</th>
+                            <th className="px-4 py-2.5 text-right">Expiration</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 font-semibold text-neutral-700" data-testid="modal-sources">
+                          {selectedPool.raw_milk?.map((rm) => (
+                            <tr key={rm.ctn} className="hover:bg-slate-100/50 transition-colors">
+                              <td className="px-4 py-3.5 font-bold text-neutral-900">{rm.ctn}</td>
+                              <td className="px-4 py-3.5 text-right text-neutral-800">{rm.volume_ml} mL</td>
+                              <td className="px-4 py-3.5 text-right text-neutral-500">
+                                {rm.expiration_date ? new Date(rm.expiration_date).toLocaleDateString() : 'N/A'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="px-6 py-4.5 bg-neutral-50 border-t border-neutral-150 flex items-center justify-end gap-3.5">
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50">
               <button
-                onClick={() => setSelectedPool(null)}
-                className="px-5 py-2.5 text-xs font-bold text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-all"
-                data-testid="close-modal-btn"
+                onClick={handleDeletePool}
+                className="px-6 py-3 text-red-600 hover:bg-red-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
               >
-                Close
+                <Trash2 className="size-4" /> Delete
               </button>
-              {selectedPool.status === 'Pooled' && (
+              <button
+                onClick={handleOpenEditForm}
+                className="px-6 py-3 text-brand-teal hover:bg-brand-teal/10 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+              >
+                <Edit2 className="size-4" /> Edit
+              </button>
+              {selectedPool.milk_status === 'good' && Number(selectedPool.remaining_volume_ml) > 0 && (
                 <button
-                  onClick={() => handlePasteurize(selectedPool.id)}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all shadow-[0_2px_8px_rgba(0,105,111,0.15)]"
+                  onClick={handleOpenPasteurizeForm}
+                  className="px-6 py-3 text-white bg-brand-teal hover:bg-brand-teal/90 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-brand-teal/20"
                   data-testid="modal-pasteurize-btn"
                 >
-                  Pasteurize Batch
+                  <Sparkles className="size-4" /> Pasteurize
                 </button>
               )}
+              <button
+                onClick={() => setSelectedPool(null)}
+                className="px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-xl transition-colors ml-2 shadow-lg shadow-neutral-900/20"
+                data-testid="close-modal-btn"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Form Modal */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-all duration-300">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50">
+              <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
+                <Combine className="size-6 text-brand-teal" />
+                Edit Pool Batch
+              </h3>
+              <button
+                onClick={() => setIsFormOpen(false)}
+                className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-full transition-colors"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              {formError && (
+                <div className="mb-5 p-4 bg-red-50 text-red-600 text-sm font-semibold rounded-2xl border border-red-100 flex items-start gap-3">
+                  <Info className="size-5 shrink-0" />
+                  <p>{formError}</p>
+                </div>
+              )}
+              <form id="pool-edit-form" onSubmit={handleFormSubmit} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Actual Volume (mL) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={formData.actual_volume_ml || ''}
+                    onChange={(e) => setFormData({ ...formData, actual_volume_ml: Number(e.target.value) })}
+                    className="w-full text-sm font-bold text-neutral-800 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all outline-none"
+                    placeholder="Enter volume in mL"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Remarks</label>
+                  <textarea
+                    rows={3}
+                    maxLength={100}
+                    value={formData.remarks || ''}
+                    onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                    className="w-full text-sm font-bold text-neutral-800 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all outline-none resize-none placeholder:text-neutral-400 placeholder:font-medium"
+                    placeholder="Optional details (max 100 characters)"
+                  />
+                </div>
+              </form>
+            </div>
+
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50">
+              <button
+                onClick={() => setIsFormOpen(false)}
+                className="px-6 py-3 rounded-xl font-bold text-sm text-neutral-600 hover:bg-neutral-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="pool-edit-form"
+                disabled={isSubmitting}
+                className="px-6 py-3 rounded-xl font-bold text-sm text-white bg-brand-teal hover:bg-brand-teal/90 transition-colors disabled:opacity-70 flex items-center gap-2 shadow-lg shadow-brand-teal/20"
+              >
+                {isSubmitting ? (
+                  <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Combine className="size-5" />
+                )}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pasteurize Form Modal */}
+      {isPasteurizeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-all duration-300" data-testid="pasteurize-modal">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50">
+              <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
+                <Sparkles className="size-6 text-brand-teal" />
+                Pasteurize Batch
+              </h3>
+              <button
+                onClick={() => setIsPasteurizeOpen(false)}
+                className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-full transition-colors"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              {pasteurizeError && (
+                <div className="mb-5 p-4 bg-red-50 text-red-600 text-sm font-semibold rounded-2xl border border-red-100 flex items-start gap-3">
+                  <Info className="size-5 shrink-0" />
+                  <p>{pasteurizeError}</p>
+                </div>
+              )}
+              <form id="pasteurize-form" onSubmit={handlePasteurizeSubmit} className="space-y-5">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Bottle Count *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={pasteurizeData.bottle_count || ''}
+                    onChange={(e) => setPasteurizeData({ ...pasteurizeData, bottle_count: e.target.value })}
+                    className="w-full text-sm font-bold text-neutral-800 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all outline-none"
+                    placeholder="Enter bottle count"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Volume per Bottle (mL) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={50}
+                    value={pasteurizeData.volume_per_bottle || ''}
+                    onChange={(e) => setPasteurizeData({ ...pasteurizeData, volume_per_bottle: e.target.value })}
+                    className="w-full text-sm font-bold text-neutral-800 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all outline-none"
+                    placeholder="Enter volume per bottle in mL"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Bottle Type *</label>
+                  <CustomDropdown
+                    value={pasteurizeData.bottle_type || 'ameda'}
+                    onChange={(val: string) => setPasteurizeData({ ...pasteurizeData, bottle_type: val })}
+                    triggerClassName="w-full text-sm font-bold text-neutral-800 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-3 hover:bg-slate-100 transition-all"
+                    dropdownClassName="!min-w-0 w-full rounded-2xl border-neutral-100 shadow-xl p-1 z-[60]"
+                    optionClassName="text-sm font-bold py-2.5 px-3 rounded-xl"
+                    options={[
+                      { value: 'ameda', label: 'Ameda' },
+                      { value: 'korea', label: 'Korea' },
+                      { value: 'red_cap', label: 'Red Cap' }
+                    ]}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Pasteurization Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={pasteurizeData.pasteurization_date || ''}
+                    onChange={(e) => setPasteurizeData({ ...pasteurizeData, pasteurization_date: e.target.value })}
+                    className="w-full text-sm font-bold text-neutral-800 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all outline-none"
+                  />
+                </div>
+              </form>
+            </div>
+
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setIsPasteurizeOpen(false)}
+                className="px-6 py-3 rounded-xl font-bold text-sm text-neutral-600 hover:bg-neutral-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="pasteurize-form"
+                disabled={isPasteurizing}
+                className="px-6 py-3 rounded-xl font-bold text-sm text-white bg-brand-teal hover:bg-brand-teal/90 transition-colors disabled:opacity-70 flex items-center gap-2 shadow-lg shadow-brand-teal/20"
+              >
+                {isPasteurizing ? (
+                  <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Sparkles className="size-5" />
+                )}
+                Confirm Pasteurization
+              </button>
             </div>
           </div>
         </div>

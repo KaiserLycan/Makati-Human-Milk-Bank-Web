@@ -11,6 +11,13 @@ jest.mock('next/link', () => {
   return MockLink;
 });
 
+// Mock api utility
+jest.mock('../../utils/api', () => ({
+  api: {
+    get: jest.fn(() => new Promise(() => {})),
+  },
+}));
+
 describe('StaffDashboard Component', () => {
   it('renders sidebar navigation links, profile section, and notification', () => {
     render(<StaffDashboard />);

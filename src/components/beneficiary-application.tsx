@@ -4,10 +4,12 @@ import React, { useState, useRef } from 'react';
 import { UploadCloud, FileText, X, CheckCircle, Trash2 } from 'lucide-react';
 import Navbar from './ui/navbar';
 import Footer from './ui/footer';
+import {api} from '../utils/api';
 
 export interface BeneficiaryApplicationProps {
   onSubmitSuccess?: (data: any) => void;
 }
+
 
 export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryApplicationProps) {
   // Form State
@@ -16,6 +18,7 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
     infantFirstName: '',
     infantMiddleName: '',
     infantLastName: '',
+    infantSuffix: '',
     infantDateOfBirth: '',
     infantWeight: '',
     feedingRequirement: '',
@@ -24,6 +27,7 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
     parentFirstName: '',
     parentMiddleName: '',
     parentLastName: '',
+    parentSuffix: '',
     parentHomeAddress: '',
     parentPhoneNumber: '',
     parentEmailAddress: '',
@@ -100,22 +104,71 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitError, setIsSubmitError] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API Submission
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitMessage('Your beneficiary application has been submitted successfully! We will contact you soon.');
+    try {
+      // 1. Format phone number to E.164 (e.g. +639171234567)
+      let caregiverPhone = formData.parentPhoneNumber.replace(/[^\d+]/g, '');
+      if (caregiverPhone.startsWith('0')) {
+        caregiverPhone = '+63' + caregiverPhone.slice(1);
+      } else if (/^[1-9]/.test(caregiverPhone) && !caregiverPhone.startsWith('+')) {
+        caregiverPhone = '+63' + caregiverPhone;
+      }
+
+      // 2. Parse weight into kilograms.
+      // If user inputs a value > 30, we assume it's in grams and divide by 1000.
+      const weightVal = parseFloat(formData.infantWeight.replace(/[^\d.]/g, ''));
+      const weight_kg = isNaN(weightVal) ? 0 : (weightVal > 30 ? parseFloat((weightVal / 1000).toFixed(2)) : weightVal);
+
+      // 3. Parse feeding requirement to a numeric ml value
+      const feedingVal = parseFloat(formData.feedingRequirement.replace(/[^\d.]/g, ''));
+      const feeding_requirement_ml = isNaN(feedingVal) ? 0 : feedingVal;
+
+      const registrationData = {
+        name: `${formData.infantFirstName} ${formData.infantMiddleName ? formData.infantMiddleName + ' ' : ''}${formData.infantLastName}${formData.infantSuffix ? ' ' + formData.infantSuffix : ''}`.trim(),
+        caregiver: `${formData.parentFirstName} ${formData.parentMiddleName ? formData.parentMiddleName + ' ' : ''}${formData.parentLastName}${formData.parentSuffix ? ' ' + formData.parentSuffix : ''}`.trim(),
+        caregiver_email: formData.parentEmailAddress,
+        caregiver_phone: caregiverPhone,
+        birth_date: formData.infantDateOfBirth,
+        weight_kg,
+        feeding_requirement_ml,
+        profile: {}, // Initialize to avoid backend TypeError when setting uploaded file URLs
+      };
+
+      const formDataToSend = new FormData();
+      formDataToSend.append('data', JSON.stringify(registrationData));
+
+      if (prescriptionFile) {
+        formDataToSend.append('prescription_details', prescriptionFile);
+      }
+      if (clinicalAbstractFile) {
+        formDataToSend.append('clinical_abstract', clinicalAbstractFile);
+      }
+
+      const response = await api.post('/api/beneficiaries/public-register', formDataToSend);
+      
+      setSubmitMessage('Your beneficiary application has been submitted successfully! We will review it shortly.');
+      setIsSubmitError(false);
+
       if (onSubmitSuccess) {
         onSubmitSuccess({
           ...formData,
-          prescriptionFileName: prescriptionFile?.name || null,
-          clinicalAbstractFileName: clinicalAbstractFile?.name || null,
+          prescriptionFileName: prescriptionFile?.name || '',
+          clinicalAbstractFileName: clinicalAbstractFile?.name || '',
         });
       }
-    }, 1500);
+    } catch (error: any) {
+      console.error('Error submitting application:', error);
+      const errorMessage = error.response?.data?.message || 'An error occurred while submitting your application. Please try again.';
+      setSubmitMessage(errorMessage);
+      setIsSubmitError(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Helper to format file size
@@ -241,16 +294,24 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
           </div>
 
           {submitMessage ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center animate-in fade-in duration-300">
-              <h2 className="text-emerald-950 font-bold text-xl mb-2 font-sans">
-                Submission Completed
+            <div className={`border rounded-2xl p-6 text-center animate-in fade-in duration-300 ${
+              isSubmitError 
+                ? 'bg-red-50 border-red-200 text-red-800' 
+                : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+            }`}>
+              <h2 className={`font-bold text-xl mb-2 font-sans ${
+                isSubmitError ? 'text-red-950' : 'text-emerald-950'
+              }`}>
+                {isSubmitError ? 'Submission Failed' : 'Submission Completed'}
               </h2>
-              <p className="text-emerald-800 font-sans text-sm sm:text-base mb-6">
+              <p className="font-sans text-sm sm:text-base mb-6">
                 {submitMessage}
               </p>
               <button
                 onClick={() => setSubmitMessage(null)}
-                className="bg-brand-teal hover:bg-brand-teal-dark text-white font-sans font-semibold text-sm px-6 py-2 rounded-full transition-all"
+                className={`text-white font-sans font-semibold text-sm px-6 py-2 rounded-full transition-all ${
+                  isSubmitError ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-teal hover:bg-brand-teal-dark'
+                }`}
               >
                 Go Back
               </button>
@@ -264,9 +325,9 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                   Infant’s Information
                 </legend>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
                   {/* Infant First Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="infantFirstName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       First Name
                     </label>
@@ -282,7 +343,7 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                     />
                   </div>
                   {/* Infant Middle Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="infantMiddleName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       Middle Name
                     </label>
@@ -297,7 +358,7 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                     />
                   </div>
                   {/* Infant Last Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="infantLastName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       Last Name
                     </label>
@@ -311,6 +372,25 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                       placeholder="Last Name"
                       className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
                     />
+                  </div>
+                  {/* Infant Suffix */}
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
+                    <label htmlFor="infantSuffix" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                      Suffix
+                    </label>
+                    <select
+                      id="infantSuffix"
+                      name="infantSuffix"
+                      value={formData.infantSuffix}
+                      onChange={handleInputChange}
+                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                    >
+                      <option value="">None</option>
+                      <option value="Jr.">Jr.</option>
+                      <option value="Sr.">Sr.</option>
+                      <option value="II">II</option>
+                      <option value="III">III</option>
+                    </select>
                   </div>
                 </div>
 
@@ -371,9 +451,9 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                   Parent/Guardian Information
                 </legend>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
                   {/* Parent First Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="parentFirstName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       First Name
                     </label>
@@ -389,7 +469,7 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                     />
                   </div>
                   {/* Parent Middle Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="parentMiddleName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       Middle Name
                     </label>
@@ -404,7 +484,7 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                     />
                   </div>
                   {/* Parent Last Name */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
                     <label htmlFor="parentLastName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
                       Last Name
                     </label>
@@ -418,6 +498,25 @@ export default function BeneficiaryApplication({ onSubmitSuccess }: BeneficiaryA
                       placeholder="Last Name"
                       className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
                     />
+                  </div>
+                  {/* Parent Suffix */}
+                  <div className="sm:col-span-3 flex flex-col gap-1.5">
+                    <label htmlFor="parentSuffix" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                      Suffix
+                    </label>
+                    <select
+                      id="parentSuffix"
+                      name="parentSuffix"
+                      value={formData.parentSuffix}
+                      onChange={handleInputChange}
+                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                    >
+                      <option value="">None</option>
+                      <option value="Jr.">Jr.</option>
+                      <option value="Sr.">Sr.</option>
+                      <option value="II">II</option>
+                      <option value="III">III</option>
+                    </select>
                   </div>
                 </div>
 
