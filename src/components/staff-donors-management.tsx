@@ -1442,7 +1442,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
                 <Plus className="size-5 text-brand-teal" />
-                <h3 className="text-lg font-bold text-neutral-900">New Donor Registration</h3>
+                <h3 className="text-lg font-bold text-neutral-900">{isEditMode ? 'Edit Donor Profile' : 'New Donor Registration'}</h3>
               </div>
               <button
                 type="button"
