@@ -191,6 +191,27 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     clinicalAbstractFileName: '',
   });
 
+  const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
+  const [clinicalAbstractFile, setClinicalAbstractFile] = useState<File | null>(null);
+
+  const downloadFile = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Failed to download file:", err);
+      window.open(url, '_blank');
+    }
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSidebarNotification(false);
@@ -362,11 +383,21 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         birth_date: newBeneficiaryForm.infantDob,
         weight_kg: parseFloat(newBeneficiaryForm.infantWeight) / 1000,
         feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement),
-        profile: {},
+        profile: {
+          prescription_details: prescriptionFile ? prescriptionFile.name : "N/A",
+          clinical_abstract: clinicalAbstractFile ? clinicalAbstractFile.name : "N/A",
+        },
       };
 
       const formData = new FormData();
       formData.append("data", JSON.stringify(payload));
+
+      if (prescriptionFile) {
+        formData.append("prescription_details", prescriptionFile);
+      }
+      if (clinicalAbstractFile) {
+        formData.append("clinical_abstract", clinicalAbstractFile);
+      }
 
       await api.post('/api/beneficiaries/register', formData);
 
@@ -390,6 +421,8 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         prescriptionFileName: '',
         clinicalAbstractFileName: '',
       });
+      setPrescriptionFile(null);
+      setClinicalAbstractFile(null);
       setRegisterTab(1);
 
       fetchBeneficiariesData(); // Refresh the table
@@ -848,7 +881,15 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                       {(selectedBeneficiary || selectedApplicant)?.prescriptionFileName ? (
                         <div className="flex items-center justify-between text-[10px] text-emerald-700 font-bold mt-2">
                           <span className="bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">Verified</span>
-                          <button className="flex items-center gap-1 text-brand-teal hover:underline cursor-pointer">
+                          <button
+                            onClick={() => {
+                              const doc = selectedBeneficiary || selectedApplicant;
+                              if (doc && doc.prescriptionFileName) {
+                                downloadFile(doc.prescriptionFileName, "prescription.pdf");
+                              }
+                            }}
+                            className="flex items-center gap-1 text-brand-teal hover:underline cursor-pointer"
+                          >
                             <FileDown className="size-3.5" />
                             Download
                           </button>
@@ -871,7 +912,15 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                       {(selectedBeneficiary || selectedApplicant)?.clinicalAbstractFileName ? (
                         <div className="flex items-center justify-between text-[10px] text-emerald-700 font-bold mt-2">
                           <span className="bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">Verified</span>
-                          <button className="flex items-center gap-1 text-brand-teal hover:underline cursor-pointer">
+                          <button
+                            onClick={() => {
+                              const doc = selectedBeneficiary || selectedApplicant;
+                              if (doc && doc.clinicalAbstractFileName) {
+                                downloadFile(doc.clinicalAbstractFileName, "clinical_abstract.pdf");
+                              }
+                            }}
+                            className="flex items-center gap-1 text-brand-teal hover:underline cursor-pointer"
+                          >
                             <FileDown className="size-3.5" />
                             Download
                           </button>
@@ -1121,31 +1170,46 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
                       Clinical Document Uploads
                     </h4>
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label htmlFor="reg-prescription" className="text-neutral-500">Doctor's Prescription File Name</label>
+                        <label htmlFor="reg-prescription" className="text-neutral-500">Doctor's Prescription</label>
                         <input
                           id="reg-prescription"
-                          type="text"
-                          placeholder="e.g. prescription.pdf"
-                          value={newBeneficiaryForm.prescriptionFileName}
-                          onChange={(e) => setNewBeneficiaryForm({ ...newBeneficiaryForm, prescriptionFileName: e.target.value })}
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              setPrescriptionFile(e.target.files[0]);
+                            }
+                          }}
                           className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-xs"
                           data-testid="input-prescription-file"
                         />
+                        {prescriptionFile && (
+                          <div className="text-emerald-600 font-sans text-xs mt-1">
+                            Selected: {prescriptionFile.name}
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-1.5">
-                        <label htmlFor="reg-abstract" className="text-neutral-500">Clinical Abstract File Name</label>
+                        <label htmlFor="reg-abstract" className="text-neutral-500">Clinical Abstract</label>
                         <input
                           id="reg-abstract"
-                          type="text"
-                          placeholder="e.g. clinical_abstract.pdf"
-                          value={newBeneficiaryForm.clinicalAbstractFileName}
-                          onChange={(e) => setNewBeneficiaryForm({ ...newBeneficiaryForm, clinicalAbstractFileName: e.target.value })}
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              setClinicalAbstractFile(e.target.files[0]);
+                            }
+                          }}
                           className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-xs"
                           data-testid="input-abstract-file"
                         />
+                        {clinicalAbstractFile && (
+                          <div className="text-emerald-600 font-sans text-xs mt-1">
+                            Selected: {clinicalAbstractFile.name}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
