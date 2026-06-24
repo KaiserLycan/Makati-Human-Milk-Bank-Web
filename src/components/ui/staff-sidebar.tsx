@@ -83,32 +83,21 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     reloadWindow();
   };
 
-  const handleLogout = async () => {
-    try {
-      localStorage.removeItem('mhmb_logged_in');
-      await api.post('/api/auth/logout');
-    } catch (e) {
-      // Ignore network errors on logout
-    }
-    router.push('/work');
+  const handleLogout = () => {
+    setLogoutError(null);
+    setIsLogoutOpen(true);
   };
 
   const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
     setLogoutError(null);
-    try {
-      const res = await fetch('http://localhost:5000/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Logout failed. Please try again.');
-      }
-      router.push('/');
-    } catch (err) {
+    try{
+      localStorage.removeItem('mhmb_logged_in');
+      await api.post('/api/auth/logout');
+      router.push('/work');
+    } catch (err: any){
       setLogoutError(
-        err instanceof Error ? err.message : 'Logout failed. Please try again.'
+        err?.response?.data?.error || 'Logout failed. Please Try Again.'
       );
       setIsLoggingOut(false);
     }
