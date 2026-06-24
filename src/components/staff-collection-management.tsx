@@ -415,7 +415,7 @@ export default function StaffCollectionManagement() {
     if (selectedCollection.donor) {
       setDonorSearchQuery(`${selectedCollection.donor.name} (DTN: ${selectedCollection.donor.dtn})`);
     } else {
-      setDonorSearchQuery(selectedCollection.donor?.dtn?.toString() || '');
+      setDonorSearchQuery('');
     }
     
     setFormError('');
@@ -433,7 +433,7 @@ export default function StaffCollectionManagement() {
     setFormError('');
 
     try {
-      const payload = { ...formData, collected_by: user.user_id };
+      const payload: any = { ...formData, collected_by: user.user_id };
 
       if (payload.volume_ml) payload.volume_ml = Number(payload.volume_ml);
       
