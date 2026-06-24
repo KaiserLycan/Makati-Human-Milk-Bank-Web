@@ -378,6 +378,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         rawArray = []; 
       }
 
+     
+        
       // 2. THE TRANSLATOR
       const mappedData = rawArray.map((d: any) => {
         const profile = d.profile || {};
@@ -386,30 +388,25 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         const donationInfo = profile.donation_information || {};
         const medicalInfo = profile.medical_information || {};
         
-        return {
+        // This is a "base" object containing everything common to both
+        const base = {
           id: d.dtn,
           name: d.name,
-          status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Active' : 'Inactive'),
-          dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
-          lastDonation: donationInfo.last_donation || 'N/A',
           dob: d.birth_date ? new Date(d.birth_date).toISOString().split('T')[0] : 'N/A',
           occupation: personal.occupation || '',
           maritalStatus: personal.marital_status || '',
           address: personal.home_address || '',
           phone: d.phone,
           email: d.email,
-
           travel: travelInfo.travelled_recently === 'yes' ? 'Yes' : 'No',
           travelCountries: travelInfo.country_visited || '',
           travelPurpose: travelInfo.purpose || '',
-          
           donationReasons: donationInfo.reason || '',
           spouseSupport: donationInfo.spouse_consent === 'yes' ? 'Yes' : 'No',
           prevDonations: donationInfo.previously_donated === 'yes' ? 'Yes' : 'No',
           lastDonationDate: donationInfo.last_donation || '',
           lastDonationLocation: donationInfo.place_donated || '',
           stoppedReason: donationInfo.reason_for_stopping || '',
-
           medicalHistory: {
             tuberculosis: medicalInfo.infectious_medical_illness?.tuberculosis === 'yes' ? 'Yes' : 'No',
             hepatitisB: medicalInfo.infectious_medical_illness?.hepatitis_b === 'yes' ? 'Yes' : 'No',
@@ -435,14 +432,18 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             repeatedTransfusions: medicalInfo.blood_exposure_transfusion?.repeated_blood_transfusion === 'yes' ? 'Yes' : 'No',
           }
         };
+
+        return {
+          ...base,
+          // Add fields specifically for the Donor interface
+          status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Active' : 'Inactive'),
+          dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
+          lastDonation: donationInfo.last_donation || 'N/A',
+          // Add fields specifically for the Applicant interface
+          application_status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Approved' : 'Rejected'),
+          dateApplied: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A'
+        };
       });
-
-      // 3. SORT AND SPLIT
-      const fetchedApplicants = mappedData.filter((d: any) => d.status === 'Pending');
-      const fetchedDonors = mappedData.filter((d: any) => d.status !== 'Pending');
-
-      setApplicants(fetchedApplicants);
-      setDonors(fetchedDonors);
 
     } catch (error) {
       console.error("Failed to fetch donors:", error);
