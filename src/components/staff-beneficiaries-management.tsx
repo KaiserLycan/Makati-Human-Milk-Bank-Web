@@ -360,22 +360,15 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         caregiver_email: newBeneficiaryForm.email,
         caregiver_phone: newBeneficiaryForm.phone,
         birth_date: newBeneficiaryForm.infantDob,
-        weight_kg: parseFloat(newBeneficiaryForm.infantWeight) / 1000, // Assuming input is grams
+        weight_kg: parseFloat(newBeneficiaryForm.infantWeight) / 1000,
         feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement),
-        profile: {
-          clinical_abstract: newBeneficiaryForm.clinicalAbstractFileName,
-          prescription_details: newBeneficiaryForm.prescriptionFileName
-        }
+        profile: {},
       };
 
       const formData = new FormData();
-      formData.append("json", JSON.stringify(payload));
-      // If you are uploading files, append them here:
-      // formData.append("beneficiary_photo", fileInput);
+      formData.append("data", JSON.stringify(payload));
 
-      await api.post('/api/beneficiaries/register', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await api.post('/api/beneficiaries/register', formData);
 
       alert("Beneficiary registered successfully!");
       setIsRegisterOpen(false);
