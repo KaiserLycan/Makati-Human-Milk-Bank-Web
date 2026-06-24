@@ -1,5 +1,5 @@
 'use client';
-
+import { api } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
@@ -82,125 +82,59 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const [currentTime, setCurrentTime] = useState('');
 
   // Main list states
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([
-    {
-      id: 'B001',
-      infantFirstName: 'Leo',
-      infantMiddleName: 'Alexander',
-      infantLastName: 'Carter',
-      infantDob: '2025-11-12',
-      infantWeight: '2800',
-      feedingRequirement: '120ml/day',
-      parentFirstName: 'Olivia',
-      parentMiddleName: 'Jane',
-      parentLastName: 'Carter',
-      address: '7428 Maple Crest Drive Apt 5B, Riverton, OR 97214, United States',
-      phone: '+1 (555) 274-8391',
-      email: 'OllieCarter@example.com',
-      status: 'Active',
-      dateJoined: '2026-01-20',
-      prescriptionFileName: 'prescription_leo_carter.pdf',
-      clinicalAbstractFileName: 'abstract_leo_carter.pdf',
-    },
-    {
-      id: 'B002',
-      infantFirstName: 'Amelia',
-      infantMiddleName: 'Rose',
-      infantLastName: 'Mitchell',
-      infantDob: '2025-10-05',
-      infantWeight: '2500',
-      feedingRequirement: '150ml/day',
-      parentFirstName: 'Sophia',
-      parentMiddleName: 'Marie',
-      parentLastName: 'Mitchell',
-      address: '109 Birchwood Lane, Portland, OR 97205',
-      phone: '+1 (555) 890-4122',
-      email: 'sophia.m@example.com',
-      status: 'Inactive',
-      dateJoined: '2025-12-05',
-      prescriptionFileName: 'prescription_amelia_mitchell.pdf',
-      clinicalAbstractFileName: null,
-    },
-    {
-      id: 'B003',
-      infantFirstName: 'Noah',
-      infantMiddleName: 'James',
-      infantLastName: 'Phillips',
-      infantDob: '2025-12-25',
-      infantWeight: '3100',
-      feedingRequirement: '180ml/day',
-      parentFirstName: 'Emma',
-      parentMiddleName: 'Grace',
-      parentLastName: 'Phillips',
-      address: '438 Pine Meadows Blvd, Portland, OR 97210',
-      phone: '+1 (555) 345-0912',
-      email: 'emma.p@example.com',
-      status: 'Active',
-      dateJoined: '2026-02-22',
-      prescriptionFileName: 'prescription_noah_phillips.pdf',
-      clinicalAbstractFileName: 'abstract_noah_phillips.pdf',
-    },
-  ]);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
+  const [applicants, setApplicants] = useState<ApplicantBeneficiary[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
-  const [applicants, setApplicants] = useState<ApplicantBeneficiary[]>([
-    {
-      id: 'AB001',
-      infantFirstName: 'Grace',
-      infantMiddleName: 'Hope',
-      infantLastName: 'Jenkins',
-      infantDob: '2026-03-10',
-      infantWeight: '2400',
-      feedingRequirement: '110ml/day',
-      parentFirstName: 'Sarah',
-      parentMiddleName: 'Ann',
-      parentLastName: 'Jenkins',
-      address: '221 Oak Street Apt 3A, Makati City',
-      phone: '+63 917 555 0122',
-      email: 'sarah.j@example.com',
-      application_status: 'Pending',
-      dateApplied: '2026-06-20',
-      prescriptionFileName: 'prescription_grace_jenkins.pdf',
-      clinicalAbstractFileName: 'abstract_grace_jenkins.pdf',
-    },
-    {
-      id: 'AB002',
-      infantFirstName: 'Mason',
-      infantMiddleName: 'Oliver',
-      infantLastName: 'Henderson',
-      infantDob: '2026-02-15',
-      infantWeight: '2900',
-      feedingRequirement: '160ml/day',
-      parentFirstName: 'Lily',
-      parentMiddleName: 'Rose',
-      parentLastName: 'Henderson',
-      address: '45 Sunset Blvd, Taguig City',
-      phone: '+63 917 890 2234',
-      email: 'lily.h@example.com',
-      application_status: 'Approved',
-      dateApplied: '2026-06-18',
-      prescriptionFileName: 'prescription_mason_henderson.pdf',
-      clinicalAbstractFileName: null,
-    },
-    {
-      id: 'AB003',
-      infantFirstName: 'Aarav',
-      infantMiddleName: 'Kumar',
-      infantLastName: 'Patel',
-      infantDob: '2026-01-25',
-      infantWeight: '2700',
-      feedingRequirement: '130ml/day',
-      parentFirstName: 'Chloe',
-      parentMiddleName: 'Devi',
-      parentLastName: 'Patel',
-      address: '12 Emerald Drive, Pasig City',
-      phone: '+63 918 123 4567',
-      email: 'chloe.p@example.com',
-      application_status: 'Rejected',
-      dateApplied: '2026-06-15',
-      prescriptionFileName: null,
-      clinicalAbstractFileName: 'abstract_aarav_patel.pdf',
-    },
-  ]);
+  const fetchBeneficiariesData = async () => {
+    try {
+      setIsLoadingData(true);
+      const response = await api.get('/api/beneficiaries');
+
+      // Look at the console log you provided:
+      // response.data (the whole object) -> .data (the inner object) -> .data (the array)
+      const payload = response.data?.data?.data;
+
+      if (!Array.isArray(payload)) {
+        console.error("Data received is not an array:", payload);
+        return; // Stop if it's not an array
+      }
+
+      const mappedData = payload.map((b: any) => ({
+        id: b.bid?.toString() || 'N/A',
+        name: b.name || 'N/A',
+        infantFirstName: b.name?.split(' ')[0] || '',
+        infantMiddleName: '',
+        infantLastName: b.name?.split(' ')[1] || '',
+        infantDob: b.birth_date ? new Date(b.birth_date).toISOString().split('T')[0] : 'N/A',
+        infantWeight: b.weight_kg?.toString() || '0',
+        feedingRequirement: b.feeding_requirement_ml?.toString() || '0',
+        parentFirstName: b.caregiver || 'N/A',
+        parentMiddleName: '',
+        parentLastName: '',
+        address: b.address || '',
+        phone: b.caregiver_phone || '',
+        email: b.caregiver_email || '',
+        status: (b.account_status === 'active' ? 'Active' : 'Inactive') as 'Active' | 'Inactive' | 'Pending',
+        dateJoined: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A',
+        prescriptionFileName: b.profile?.prescription_details || null,
+        clinicalAbstractFileName: b.profile?.clinical_abstract || null,
+        application_status: (b.application_status === 'pending' ? 'Pending' : (b.account_status === 'active' ? 'Approved' : 'Rejected')) as 'Approved' | 'Pending' | 'Rejected',
+        dateApplied: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A'
+      }));
+
+      setBeneficiaries(mappedData.filter((b: any) => b.status !== 'Pending'));
+      setApplicants(mappedData.filter((b: any) => b.application_status === 'Pending'));
+    } catch (error) {
+      console.error("Failed to fetch beneficiaries:", error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBeneficiariesData();
+  }, [mode]); // Triggers when component mounts or mode switches
 
   // Query Filter States
   const [search, setSearch] = useState('');
@@ -459,13 +393,13 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
-      
+
       {/* Sidebar Navigation */}
       <StaffSidebar activeItem={mode === 'beneficiaries' ? 'beneficiaries' : 'applicants-beneficiaries'} />
 
       {/* Main Workspace */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        
+
         {/* Header */}
         <header className="px-8 py-6 bg-white border-b border-neutral-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0">
           <div>
@@ -492,7 +426,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
         {/* Workspace Body */}
         <main className="p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
-          
+
           {/* Action and Filter Row */}
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
@@ -652,7 +586,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                 <span className="text-neutral-500 font-bold">
                   Showing {(page - 1) * limit + 1} - {Math.min(page * limit, totalItems)} of {totalItems} entries
                 </span>
-                
+
                 <div className="flex items-center gap-1.5" data-testid="pagination-nav">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -662,16 +596,15 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                   >
                     <ChevronLeft className="size-4" />
                   </button>
-                  
+
                   {Array.from({ length: totalPages }).map((_, idx) => (
                     <button
                       key={idx}
                       onClick={() => setPage(idx + 1)}
-                      className={`size-8 font-bold border rounded-xl transition-all cursor-pointer ${
-                        page === idx + 1
-                          ? 'bg-brand-teal border-brand-teal text-white shadow-sm'
-                          : 'border-neutral-200 hover:bg-white text-neutral-600'
-                      }`}
+                      className={`size-8 font-bold border rounded-xl transition-all cursor-pointer ${page === idx + 1
+                        ? 'bg-brand-teal border-brand-teal text-white shadow-sm'
+                        : 'border-neutral-200 hover:bg-white text-neutral-600'
+                        }`}
                       data-testid={`page-btn-${idx + 1}`}
                     >
                       {idx + 1}
@@ -698,7 +631,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       {(selectedBeneficiary || selectedApplicant) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="detail-modal">
           <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200 flex flex-col">
-            
+
             {/* Modal Sticky Header */}
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
@@ -719,7 +652,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
             {/* Modal Body Columns */}
             <div className="p-8 flex flex-col md:flex-row gap-8 overflow-y-auto">
-              
+
               {/* Left Column: Side Profile */}
               <div className="w-full md:w-72 shrink-0 space-y-6">
                 <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col items-center gap-5 text-center shadow-sm">
@@ -731,7 +664,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                       (selectedBeneficiary || selectedApplicant)!.infantLastName
                     ).split(' ').map((n) => n[0]).join('')}
                   </div>
-                  
+
                   {/* Minimal metadata info */}
                   <div className="space-y-1.5 w-full">
                     <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-profile-name">
@@ -746,8 +679,8 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                     </p>
                     <div className="pt-2">
                       <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(
-                        mode === 'beneficiaries' 
-                          ? (selectedBeneficiary as Beneficiary)?.status 
+                        mode === 'beneficiaries'
+                          ? (selectedBeneficiary as Beneficiary)?.status
                           : (selectedApplicant as ApplicantBeneficiary)?.application_status
                       )}`} data-testid="modal-profile-status">
                         {mode === 'beneficiaries' ? (selectedBeneficiary as Beneficiary)?.status : (selectedApplicant as ApplicantBeneficiary)?.application_status}
@@ -756,7 +689,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                   </div>
 
                   <hr className="w-full border-neutral-100" />
-                  
+
                   <div className="w-full text-left space-y-2 text-xs">
                     <p className="text-neutral-500 font-bold font-sans uppercase text-[9px] tracking-widest">Profile Stats</p>
                     <p className="flex justify-between">
@@ -770,7 +703,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
                 {/* Profile actions */}
                 <div className="space-y-3.5">
-                  <button 
+                  <button
                     onClick={() => {
                       if (mode === 'beneficiaries' && selectedBeneficiary) {
                         setBeneficiaries(beneficiaries.map((b) => b.id === selectedBeneficiary.id ? { ...b, status: b.status === 'Active' ? 'Inactive' : 'Active' } : b));
@@ -783,12 +716,12 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                     className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
                     data-testid="toggle-profile-status-btn"
                   >
-                    {mode === 'beneficiaries' 
+                    {mode === 'beneficiaries'
                       ? ((selectedBeneficiary?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
                       : ((selectedApplicant?.application_status === 'Approved') ? 'Mark as Pending' : 'Approve Profile')
                     }
                   </button>
-                  <button 
+                  <button
                     onClick={() => {
                       if (mode === 'beneficiaries' && selectedBeneficiary) {
                         setBeneficiaries(beneficiaries.filter((b) => b.id !== selectedBeneficiary.id));
@@ -808,7 +741,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
               {/* Right Column: Collapsible Info Cards */}
               <div className="flex-1 space-y-6">
-                
+
                 {/* 1. Infant Information */}
                 <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm" data-testid="profile-section-infant">
                   <h4 className="text-sm font-bold text-neutral-900 border-b border-neutral-100 pb-2 uppercase tracking-wide flex items-center gap-2">
@@ -878,7 +811,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                     <FileText className="size-4 text-brand-teal" />
                     Clinical Documents & Verification
                   </h4>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* Prescription Card */}
                     <div className="border border-neutral-200 rounded-xl p-4 flex flex-col justify-between gap-3 text-xs bg-slate-50/50">
@@ -939,12 +872,12 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       {/* REGISTRATION MODAL (New Beneficiary Applicant Tabbed Form) */}
       {isRegisterOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="register-modal">
-          <form 
-            onSubmit={handleRegisterSubmit} 
+          <form
+            onSubmit={handleRegisterSubmit}
             data-testid="register-form"
             className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200 flex flex-col"
           >
-            
+
             {/* Modal Header */}
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
@@ -973,11 +906,10 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                   key={item.tab}
                   type="button"
                   onClick={() => setRegisterTab(item.tab)}
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                    registerTab === item.tab
-                      ? 'bg-brand-teal text-white shadow-sm'
-                      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
-                  }`}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${registerTab === item.tab
+                    ? 'bg-brand-teal text-white shadow-sm'
+                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+                    }`}
                   data-testid={`register-tab-${item.tab}`}
                 >
                   {item.label}
@@ -987,7 +919,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
             {/* Modal Form Body */}
             <div className="p-8 flex-1 overflow-y-auto space-y-6">
-              
+
               {/* TAB 1: Infant Details */}
               {registerTab === 1 && (
                 <div className="space-y-6" data-testid="register-pane-1">
@@ -1165,7 +1097,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
                       Clinical Document Uploads
                     </h4>
-                    
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label htmlFor="reg-prescription" className="text-neutral-500">Doctor's Prescription File Name</label>
@@ -1212,7 +1144,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                   </button>
                 )}
               </div>
-              
+
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -1221,7 +1153,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                 >
                   Cancel
                 </button>
-                
+
                 {registerTab < 3 ? (
                   <button
                     type="button"
