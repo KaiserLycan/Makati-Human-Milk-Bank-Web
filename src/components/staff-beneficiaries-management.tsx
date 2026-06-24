@@ -194,6 +194,27 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [clinicalAbstractFile, setClinicalAbstractFile] = useState<File | null>(null);
 
+  // Edit Beneficiary Form State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editBeneficiaryForm, setEditBeneficiaryForm] = useState({
+    id: '',
+    infantFirstName: '',
+    infantMiddleName: '',
+    infantLastName: '',
+    infantDob: '',
+    infantWeight: '',
+    feedingRequirement: '',
+    parentFirstName: '',
+    parentMiddleName: '',
+    parentLastName: '',
+    address: '',
+    phone: '',
+    email: '',
+  });
+
+  const [editPrescriptionFile, setEditPrescriptionFile] = useState<File | null>(null);
+  const [editClinicalAbstractFile, setEditClinicalAbstractFile] = useState<File | null>(null);
+
   const downloadFile = async (url: string, fileName: string) => {
     try {
       const response = await fetch(url);
@@ -432,6 +453,81 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     } catch (error) {
       console.error("Registration failed:", error);
       alert("Failed to register beneficiary.");
+    }
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = (b: Beneficiary | ApplicantBeneficiary) => {
+    // If the weight is stored as kg (e.g. "3.5"), convert to grams (e.g. "3500")
+    const weightInGrams = b.infantWeight ? (parseFloat(b.infantWeight) * 1000).toString() : '';
+
+    setEditBeneficiaryForm({
+      id: b.id,
+      infantFirstName: b.infantFirstName || '',
+      infantMiddleName: b.infantMiddleName || '',
+      infantLastName: b.infantLastName || '',
+      infantDob: b.infantDob && b.infantDob !== 'N/A' ? b.infantDob : '',
+      infantWeight: weightInGrams,
+      feedingRequirement: b.feedingRequirement || '',
+      parentFirstName: b.parentFirstName || '',
+      parentMiddleName: b.parentMiddleName || '',
+      parentLastName: b.parentLastName || '',
+      address: b.address || '',
+      phone: b.phone || '',
+      email: b.email || '',
+    });
+    setEditPrescriptionFile(null);
+    setEditClinicalAbstractFile(null);
+    setIsEditOpen(true);
+  };
+
+  // Submit update form
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      const birthDate = editBeneficiaryForm.infantDob || new Date().toISOString().split('T')[0];
+      const existingPrescription = (selectedBeneficiary || selectedApplicant)?.prescriptionFileName || "";
+      const existingAbstract = (selectedBeneficiary || selectedApplicant)?.clinicalAbstractFileName || "";
+
+      const payload = {
+        name: `${editBeneficiaryForm.infantFirstName} ${editBeneficiaryForm.infantLastName}`,
+        caregiver: `${editBeneficiaryForm.parentFirstName} ${editBeneficiaryForm.parentLastName}`,
+        caregiver_email: editBeneficiaryForm.email,
+        caregiver_phone: editBeneficiaryForm.phone,
+        birth_date: birthDate,
+        weight_kg: parseFloat(editBeneficiaryForm.infantWeight) / 1000,
+        feeding_requirement_ml: parseInt(editBeneficiaryForm.feedingRequirement),
+        address: editBeneficiaryForm.address,
+        profile: {
+          prescription_details: editPrescriptionFile ? "" : existingPrescription,
+          clinical_abstract: editClinicalAbstractFile ? "" : existingAbstract,
+        },
+      };
+
+      const formData = new FormData();
+      formData.append("data", JSON.stringify(payload));
+
+      if (editPrescriptionFile) {
+        formData.append("prescription_details", editPrescriptionFile);
+      }
+      if (editClinicalAbstractFile) {
+        formData.append("clinical_abstract", editClinicalAbstractFile);
+      }
+
+      await api.put(`/api/beneficiaries/${editBeneficiaryForm.id}`, formData);
+
+      alert("Beneficiary details updated successfully!");
+      setIsEditOpen(false);
+
+      // Close detail modals
+      setSelectedBeneficiary(null);
+      setSelectedApplicant(null);
+
+      fetchBeneficiariesData(); // Refresh the table
+    } catch (error) {
+      console.error("Update failed:", error);
+      alert("Failed to update beneficiary.");
     }
   };
 
@@ -789,6 +885,13 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                       </button>
                     </>
                   )}
+                  <button
+                    onClick={() => handleOpenEditModal(selectedBeneficiary || selectedApplicant!)}
+                    className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                    data-testid="edit-profile-btn"
+                  >
+                    Edit Profile
+                  </button>
                   <button
                     onClick={() => handleBeneficiaryAction('delete', selectedBeneficiary?.id || selectedApplicant!.id)}
                     className="w-full py-2.5 text-xs font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-neutral-200 hover:border-rose-600 rounded-xl transition-all shadow-sm"
@@ -1266,6 +1369,274 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
               </div>
             </div>
 
+          </form>
+        </div>
+      )}
+
+      {/* EDIT MODAL */}
+      {isEditOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="edit-modal">
+          <form
+            onSubmit={handleUpdateSubmit}
+            className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden relative animate-in fade-in zoom-in-95 duration-200 flex flex-col"
+          >
+            {/* Modal Header */}
+            <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10 shrink-0">
+              <div className="flex items-center gap-3">
+                <Baby className="size-5.5 text-brand-teal" />
+                <h3 className="text-lg font-bold text-neutral-900">Edit Beneficiary Profile</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditOpen(false)}
+                className="p-1.5 hover:bg-neutral-100 rounded-xl text-neutral-400 hover:text-neutral-600 transition-colors"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Modal Body (Scrollable Content) */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* SECTION 1: Infant Details */}
+              <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm">
+                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
+                  Infant Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-bold">
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-infant-first" className="text-neutral-500">First Name *</label>
+                    <input
+                      id="edit-infant-first"
+                      type="text"
+                      required
+                      value={editBeneficiaryForm.infantFirstName}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, infantFirstName: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-infant-first-name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-infant-middle" className="text-neutral-500">Middle Name</label>
+                    <input
+                      id="edit-infant-middle"
+                      type="text"
+                      value={editBeneficiaryForm.infantMiddleName}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, infantMiddleName: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-infant-middle-name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-infant-last" className="text-neutral-500">Last Name *</label>
+                    <input
+                      id="edit-infant-last"
+                      type="text"
+                      required
+                      value={editBeneficiaryForm.infantLastName}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, infantLastName: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-infant-last-name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-infant-dob" className="text-neutral-500">Date of Birth *</label>
+                    <input
+                      id="edit-infant-dob"
+                      type="date"
+                      required
+                      value={editBeneficiaryForm.infantDob}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, infantDob: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-infant-dob"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-infant-weight" className="text-neutral-500">Weight (grams) *</label>
+                    <input
+                      id="edit-infant-weight"
+                      type="text"
+                      required
+                      placeholder="e.g. 2500"
+                      value={editBeneficiaryForm.infantWeight}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, infantWeight: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-infant-weight"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-feed-req" className="text-neutral-500">Feeding Requirement *</label>
+                    <input
+                      id="edit-feed-req"
+                      type="text"
+                      required
+                      placeholder="e.g. 150ml/day"
+                      value={editBeneficiaryForm.feedingRequirement}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, feedingRequirement: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-feeding-requirement"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Caregiver Details */}
+              <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm">
+                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
+                  Parent / Guardian Information
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-bold">
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-parent-first" className="text-neutral-500">First Name *</label>
+                    <input
+                      id="edit-parent-first"
+                      type="text"
+                      required
+                      value={editBeneficiaryForm.parentFirstName}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, parentFirstName: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-parent-first-name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-parent-middle" className="text-neutral-500">Middle Name</label>
+                    <input
+                      id="edit-parent-middle"
+                      type="text"
+                      value={editBeneficiaryForm.parentMiddleName}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, parentMiddleName: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-parent-middle-name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-parent-last" className="text-neutral-500">Last Name *</label>
+                    <input
+                      id="edit-parent-last"
+                      type="text"
+                      required
+                      value={editBeneficiaryForm.parentLastName}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, parentLastName: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-parent-last-name"
+                    />
+                  </div>
+                  <div className="sm:col-span-3 space-y-1.5">
+                    <label htmlFor="edit-address" className="text-neutral-500">Home Address *</label>
+                    <input
+                      id="edit-address"
+                      type="text"
+                      required
+                      value={editBeneficiaryForm.address}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, address: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-address"
+                    />
+                  </div>
+                  <div className="space-y-1.5 col-span-1 sm:col-span-1">
+                    <label htmlFor="edit-phone" className="text-neutral-500">Phone Number *</label>
+                    <input
+                      id="edit-phone"
+                      type="text"
+                      required
+                      value={editBeneficiaryForm.phone}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, phone: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-phone"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <label htmlFor="edit-email" className="text-neutral-500">Email Address *</label>
+                    <input
+                      id="edit-email"
+                      type="email"
+                      required
+                      value={editBeneficiaryForm.email}
+                      onChange={(e) => setEditBeneficiaryForm({ ...editBeneficiaryForm, email: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-700"
+                      data-testid="edit-input-email"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: Documents Upload */}
+              <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm">
+                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
+                  Clinical Documents
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs font-bold">
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-prescription" className="text-neutral-500">Prescription Details (optional)</label>
+                    <input
+                      id="edit-prescription"
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          setEditPrescriptionFile(e.target.files[0]);
+                        }
+                      }}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-xs text-neutral-700"
+                      data-testid="edit-input-prescription-file"
+                    />
+                    {editPrescriptionFile ? (
+                      <div className="text-emerald-600 font-sans text-xs mt-1">
+                        New File: {editPrescriptionFile.name}
+                      </div>
+                    ) : (selectedBeneficiary || selectedApplicant)?.prescriptionFileName ? (
+                      <div className="text-neutral-500 font-sans text-xs mt-1 truncate">
+                        Current: {(selectedBeneficiary || selectedApplicant)?.prescriptionFileName}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="edit-abstract" className="text-neutral-500">Clinical Abstract (optional)</label>
+                    <input
+                      id="edit-abstract"
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          setEditClinicalAbstractFile(e.target.files[0]);
+                        }
+                      }}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-xs text-neutral-700"
+                      data-testid="edit-input-abstract-file"
+                    />
+                    {editClinicalAbstractFile ? (
+                      <div className="text-emerald-600 font-sans text-xs mt-1">
+                        New File: {editClinicalAbstractFile.name}
+                      </div>
+                    ) : (selectedBeneficiary || selectedApplicant)?.clinicalAbstractFileName ? (
+                      <div className="text-neutral-500 font-sans text-xs mt-1 truncate">
+                        Current: {(selectedBeneficiary || selectedApplicant)?.clinicalAbstractFileName}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-50 border-t border-neutral-100 px-6 py-4 flex items-center justify-end gap-3 sticky bottom-0 z-10 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsEditOpen(false)}
+                className="px-4 py-2.5 text-xs font-bold text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all shadow-[0_4px_12px_rgba(0,105,111,0.1)] cursor-pointer"
+                data-testid="edit-submit-btn"
+              >
+                Save Changes
+              </button>
+            </div>
           </form>
         </div>
       )}
