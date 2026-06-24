@@ -637,12 +637,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     }
   };
 
-  // Submit registration form
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
-      // 1. Build the exact JSON payload the backend expects
       const donorPayload = {
         name: newDonorForm.name,
         email: newDonorForm.email,
@@ -702,36 +700,26 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         }
       };
 
-      const formData = new FormData();
-      formData.append("json", JSON.stringify(donorPayload));
-
-      // 2. LOGIC SWITCH: If isEditMode is true, use PUT (Update), otherwise POST (Create)
       if (isEditMode && editTargetId) {
-        await api.put(`/api/donors/${editTargetId}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        // PUT request: Send the object directly as JSON
+        await api.put(`/api/donors/${editTargetId}`, donorPayload, {
+          headers: { 'Content-Type': 'application/json' },
         });
       } else {
+        // POST request: Backend needs FormData for the image-upload middleware
+        const formData = new FormData();
+        formData.append("json", JSON.stringify(donorPayload));
         await api.post('/api/donors/register', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       }
 
-      // 3. UI CLEANUP
+      // Cleanup
       setIsRegisterOpen(false);
-      setRegisterTab(1);
-      setIsEditMode(false);      // Reset mode
-      setEditTargetId(null);     // Clear ID
-      fetchAllDonors();          // Refresh the table with latest database data
-      
-      // Reset form
-      setNewDonorForm({
-        name: '', dob: '', occupation: '', maritalStatus: 'Single', address: '', phone: '', email: '',
-        travel: 'No', travelCountries: '', travelPurpose: '', donationReasons: '', spouseSupport: 'Yes',
-        prevDonations: 'No', lastDonationDate: '', lastDonationLocation: '', stoppedReason: '',
-        tuberculosis: 'No', hepatitisB: 'No', mastitis: 'No', syphilis: 'No', herpes: 'No', std: 'No',
-        alcohol24h: 'No', smoke: 'No', illegalDrugs: 'No', intravenousDrugs: 'No', vegetarian: 'No',
-        multivitamins: 'No', herbalHighDose: 'No', bloodProduct12m: 'No', needlePrick: 'No', repeatedTransfusions: 'No',
-      });
+      setIsEditMode(false);
+      setEditTargetId(null);
+      fetchAllDonors();
+      alert("Success!");
     } catch (error) {
       console.error("Operation failed:", error);
       alert("Action failed. Check console for details.");
