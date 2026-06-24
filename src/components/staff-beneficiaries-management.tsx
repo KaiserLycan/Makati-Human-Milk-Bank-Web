@@ -123,7 +123,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         dateApplied: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A'
       }));
 
-      setBeneficiaries(mappedData.filter((b: any) => b.status !== 'Pending'));
+      setBeneficiaries(mappedData.filter((b: any) => b.application_status !== 'Pending'));
       setApplicants(mappedData.filter((b: any) => b.application_status === 'Pending'));
     } catch (error) {
       console.error("Failed to fetch beneficiaries:", error);
