@@ -361,7 +361,11 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         caregiver_phone: newBeneficiaryForm.phone,
         birth_date: newBeneficiaryForm.infantDob,
         weight_kg: parseFloat(newBeneficiaryForm.infantWeight) / 1000, // Assuming input is grams
-        feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement)
+        feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement),
+        profile: {
+          clinical_abstract: newBeneficiaryForm.clinicalAbstractFileName,
+          prescription_details: newBeneficiaryForm.prescriptionFileName
+        }
       };
 
       const formData = new FormData();
