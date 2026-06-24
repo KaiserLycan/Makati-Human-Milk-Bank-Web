@@ -851,10 +851,14 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             {/* New Donor button (mainly on donors list or both) */}
             {mode === 'applicants' && (
               <button
-                onClick={() => setIsRegisterOpen(true)}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all duration-200 shrink-0 shadow-[0_4px_12px_rgba(0,105,111,0.15)] hover:shadow-lg hover:-translate-y-0.5"
-                data-testid="new-donor-btn"
-              >
+                  onClick={() => {
+                    setIsEditMode(false);
+                    setEditTargetId(null);
+                    setIsRegisterOpen(true);
+                  }}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all duration-200 shrink-0 shadow-[0_4px_12px_rgba(0,105,111,0.15)] hover:shadow-lg hover:-translate-y-0.5"
+                  data-testid="new-donor-btn"
+                >
                 <Plus className="size-4 stroke-[3px]" />
                 New Donor
               </button>
