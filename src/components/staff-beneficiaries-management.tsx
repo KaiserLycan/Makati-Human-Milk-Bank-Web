@@ -350,50 +350,56 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   };
 
   // Submit registration form
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newId = `AB00${applicants.length + 1}`;
-    const newApplicant: ApplicantBeneficiary = {
-      id: newId,
-      infantFirstName: newBeneficiaryForm.infantFirstName,
-      infantMiddleName: newBeneficiaryForm.infantMiddleName,
-      infantLastName: newBeneficiaryForm.infantLastName,
-      infantDob: newBeneficiaryForm.infantDob,
-      infantWeight: newBeneficiaryForm.infantWeight,
-      feedingRequirement: newBeneficiaryForm.feedingRequirement,
-      parentFirstName: newBeneficiaryForm.parentFirstName,
-      parentMiddleName: newBeneficiaryForm.parentMiddleName,
-      parentLastName: newBeneficiaryForm.parentLastName,
-      address: newBeneficiaryForm.address,
-      phone: newBeneficiaryForm.phone,
-      email: newBeneficiaryForm.email,
-      application_status: 'Pending',
-      dateApplied: new Date().toISOString().split('T')[0],
-      prescriptionFileName: newBeneficiaryForm.prescriptionFileName || 'prescription_uploaded.pdf',
-      clinicalAbstractFileName: newBeneficiaryForm.clinicalAbstractFileName || 'abstract_uploaded.pdf',
-    };
+    try {
+      const payload = {
+        name: `${newBeneficiaryForm.infantFirstName} ${newBeneficiaryForm.infantLastName}`,
+        caregiver: `${newBeneficiaryForm.parentFirstName} ${newBeneficiaryForm.parentLastName}`,
+        caregiver_email: newBeneficiaryForm.email,
+        caregiver_phone: newBeneficiaryForm.phone,
+        birth_date: newBeneficiaryForm.infantDob,
+        weight_kg: parseFloat(newBeneficiaryForm.infantWeight) / 1000, // Assuming input is grams
+        feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement)
+      };
 
-    setApplicants([newApplicant, ...applicants]);
-    setIsRegisterOpen(false);
-    // Reset form
-    setNewBeneficiaryForm({
-      infantFirstName: '',
-      infantMiddleName: '',
-      infantLastName: '',
-      infantDob: '',
-      infantWeight: '',
-      feedingRequirement: '',
-      parentFirstName: '',
-      parentMiddleName: '',
-      parentLastName: '',
-      address: '',
-      phone: '',
-      email: '',
-      prescriptionFileName: '',
-      clinicalAbstractFileName: '',
-    });
-    setRegisterTab(1);
+      const formData = new FormData();
+      formData.append("json", JSON.stringify(payload));
+      // If you are uploading files, append them here:
+      // formData.append("beneficiary_photo", fileInput);
+
+      await api.post('/api/beneficiaries/register', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      alert("Beneficiary registered successfully!");
+      setIsRegisterOpen(false);
+
+      // Reset form
+      setNewBeneficiaryForm({
+        infantFirstName: '',
+        infantMiddleName: '',
+        infantLastName: '',
+        infantDob: '',
+        infantWeight: '',
+        feedingRequirement: '',
+        parentFirstName: '',
+        parentMiddleName: '',
+        parentLastName: '',
+        address: '',
+        phone: '',
+        email: '',
+        prescriptionFileName: '',
+        clinicalAbstractFileName: '',
+      });
+      setRegisterTab(1);
+
+      fetchBeneficiariesData(); // Refresh the table
+    } catch (error) {
+      console.error("Registration failed:", error);
+      alert("Failed to register beneficiary.");
+    }
   };
 
   // Mock status badge color mappings
