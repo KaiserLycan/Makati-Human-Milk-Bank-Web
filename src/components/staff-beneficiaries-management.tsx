@@ -215,22 +215,15 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const [editPrescriptionFile, setEditPrescriptionFile] = useState<File | null>(null);
   const [editClinicalAbstractFile, setEditClinicalAbstractFile] = useState<File | null>(null);
 
-  const downloadFile = async (url: string, fileName: string) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (err) {
-      console.error("Failed to download file:", err);
-      window.open(url, '_blank');
-    }
+  const downloadFile = (url: string, fileName: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   useEffect(() => {
@@ -450,9 +443,10 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       setRegisterTab(1);
 
       fetchBeneficiariesData(); // Refresh the table
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration failed:", error);
-      alert("Failed to register beneficiary.");
+      const errMsg = error.response?.data?.message || "Failed to register beneficiary.";
+      alert(errMsg);
     }
   };
 
@@ -525,9 +519,10 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       setSelectedApplicant(null);
 
       fetchBeneficiariesData(); // Refresh the table
-    } catch (error) {
+    } catch (error: any) {
       console.error("Update failed:", error);
-      alert("Failed to update beneficiary.");
+      const errMsg = error.response?.data?.message || "Failed to update beneficiary.";
+      alert(errMsg);
     }
   };
 
