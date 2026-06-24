@@ -22,6 +22,11 @@ import {
   Shield,
   Mail,
   Calendar,
+  Milk,
+  Beaker,
+  Refrigerator,
+  HandPlatter,
+  Droplet
 } from 'lucide-react';
 import { loadProfile, saveProfile, UserProfile } from '../../utils/storage';
 import { reloadWindow } from '../../utils/navigation';
@@ -158,11 +163,6 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
               <span>Reports</span>
             </Link>
 
-            <Link href="/work/collection" className={getLinkClass('collection')} data-testid="nav-collection">
-              <ClipboardList className="size-5 shrink-0" />
-              <span>Collection</span>
-            </Link>
-
             <hr className="border-neutral-100 my-2" />
 
             {/* Donors */}
@@ -225,18 +225,23 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
 
             <hr className="border-neutral-100 my-2" />
 
+            <Link href="/work/collection" className={getLinkClass('collection')} data-testid="nav-collection">
+              <Droplet className="size-5 shrink-0" />
+              <span>Collection</span>
+            </Link>
+
             <Link href="/work/pool" className={getLinkClass('pool')} data-testid="nav-pool">
-              <Combine className="size-5 shrink-0" />
+              <Beaker className="size-5 shrink-0" />
               <span>Pool Milk</span>
             </Link>
 
             <Link href="/work/inventory" className={getLinkClass('inventory')} data-testid="nav-inventory">
-              <Database className="size-5 shrink-0" />
+              <Refrigerator className="size-5 shrink-0" />
               <span>Milk Inventory</span>
             </Link>
 
             <Link href="/work/requests" className={getLinkClass('requests')} data-testid="nav-requests">
-              <FileText className="size-5 shrink-0" />
+              <HandPlatter className="size-5 shrink-0" />
               <span>Milk Requests</span>
             </Link>
 

@@ -23,7 +23,7 @@ async function getDynamicBaseUrl(): Promise<string> {
   // During development, attempt to probe the local backend
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 800);
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
     
     await fetch('http://localhost:5000/health', {
       method: 'GET',
