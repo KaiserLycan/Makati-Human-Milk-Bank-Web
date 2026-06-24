@@ -26,7 +26,8 @@ import {
   Beaker,
   Refrigerator,
   HandPlatter,
-  Droplet
+  Droplet,
+  Phone
 } from 'lucide-react';
 import { loadProfile, saveProfile, UserProfile } from '../../utils/storage';
 import { reloadWindow } from '../../utils/navigation';
@@ -65,6 +66,31 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     role: 'manager',
   });
 
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
+  };
+
+  const getJoinedDate = () => {
+    if (profile?.created_at) {
+      try {
+        const d = new Date(profile.created_at);
+        return d.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        });
+      } catch (e) {
+        // Fallback below
+      }
+    }
+    return 'October 21, 2024';
+  };
+
   // Redirect to login if session is inactive
   useEffect(() => {
     if (typeof window !== 'undefined' && localStorage.getItem('mhmb_logged_in') !== 'true') {
@@ -75,18 +101,37 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
   useEffect(() => {
     const stored = loadProfile();
     setProfile(stored);
+
+    const fetchProfileData = async () => {
+      try {
+        const response = await api.get('/api/users/profile');
+        const user = response.data.data;
+        if (user) {
+          const updated: UserProfile = {
+            id: user.user_id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            phone: user.phone,
+            profile_image_url: user.profile_image_url,
+            created_at: user.created_at,
+            status: user.status,
+          };
+          setProfile(updated);
+          saveProfile(updated);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user profile:', err);
+      }
+    };
+
+    fetchProfileData();
+
     const timer = setTimeout(() => {
       setShowSidebarNotification(false);
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
-
-  const handleRoleChange = (role: 'manager' | 'staff') => {
-    const updated = { ...profile, role };
-    setProfile(updated);
-    saveProfile(updated);
-    reloadWindow();
-  };
 
   const handleLogout = async () => {
     try {
@@ -286,9 +331,18 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
               role="button"
               aria-label="View user profile"
             >
-              <div className="size-9 bg-neutral-200 rounded-lg overflow-hidden flex items-center justify-center font-bold text-neutral-700 text-sm group-hover:bg-brand-teal group-hover:text-white transition-colors duration-250 select-none">
-                AM
-              </div>
+              {profile?.profile_image_url ? (
+                <img
+                  src={profile.profile_image_url}
+                  alt={profile.name || 'User Profile'}
+                  className="size-9 rounded-lg object-cover"
+                  data-testid="profile-avatar"
+                />
+              ) : (
+                <div className="size-9 bg-neutral-200 rounded-lg overflow-hidden flex items-center justify-center font-bold text-neutral-700 text-sm group-hover:bg-brand-teal group-hover:text-white transition-colors duration-250 select-none">
+                  {getInitials(profile?.name)}
+                </div>
+              )}
               <div className="min-w-0">
                 <p className="text-xs font-bold text-neutral-900 truncate group-hover:text-brand-teal transition-colors" data-testid="profile-name">
                   {profile?.name}
@@ -299,7 +353,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
               </div>
             </div>
             <button
-              onClick={handleLogout}
+              onClick={() => setIsLogoutOpen(true)}
               className="text-neutral-400 hover:text-red-500 p-1.5 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
               data-testid="logout-btn"
               aria-label="Logout"
@@ -320,7 +374,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
             <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <User className="size-5 text-brand-teal" />
-                <h3 className="text-lg font-bold text-neutral-900">My Staff Profile</h3>
+                <h3 className="text-lg font-bold text-neutral-900">Profile</h3>
               </div>
               <button
                 onClick={() => setIsProfileOpen(false)}
@@ -333,9 +387,18 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
             </div>
 
             <div className="p-8 flex flex-col items-center text-center space-y-6">
-              <div className="size-28 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
-                AM
-              </div>
+              {profile?.profile_image_url ? (
+                <img
+                  src={profile.profile_image_url}
+                  alt={profile.name || 'User Profile'}
+                  className="size-28 rounded-full object-cover border border-neutral-200 shadow-inner"
+                  data-testid="profile-modal-avatar"
+                />
+              ) : (
+                <div className="size-28 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
+                  {getInitials(profile?.name)}
+                </div>
+              )}
 
               <div className="space-y-1.5 w-full">
                 <h4 className="font-bold text-neutral-950 text-lg" data-testid="profile-modal-name">
@@ -356,10 +419,18 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                 </div>
 
                 <div className="flex items-center gap-3.5">
+                  <Phone className="size-4 text-neutral-400" />
+                  <div>
+                    <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Phone Number</p>
+                    <p className="font-bold text-neutral-800">{profile?.phone || 'Not Provided'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3.5">
                   <Calendar className="size-4 text-neutral-400" />
                   <div>
                     <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Joined Date</p>
-                    <p className="font-bold text-neutral-800">October 21, 2024</p>
+                    <p className="font-bold text-neutral-800">{getJoinedDate()}</p>
                   </div>
                 </div>
 
@@ -367,18 +438,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                   <Shield className="size-4 text-neutral-400" />
                   <div className="flex-1">
                     <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Role Access Level</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="font-bold text-neutral-800 capitalize">{profile?.role}</span>
-                      <select
-                        value={profile?.role}
-                        onChange={(e) => handleRoleChange(e.target.value as 'manager' | 'staff')}
-                        className="text-[10px] font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-lg px-2.5 py-1.5 cursor-pointer outline-none transition-all"
-                        data-testid="role-selector"
-                      >
-                        <option value="manager">Manager Access</option>
-                        <option value="staff">Staff Access</option>
-                      </select>
-                    </div>
+                    <p className="font-bold text-neutral-800 capitalize mt-0.5">{profile?.role}</p>
                   </div>
                 </div>
               </div>

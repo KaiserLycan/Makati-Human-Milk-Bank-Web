@@ -57,6 +57,10 @@ export interface UserProfile {
   id: string;
   email: string;
   role: 'manager' | 'staff';
+  phone?: string;
+  profile_image_url?: string | null;
+  created_at?: string;
+  status?: string;
 }
 
 // Default datasets
