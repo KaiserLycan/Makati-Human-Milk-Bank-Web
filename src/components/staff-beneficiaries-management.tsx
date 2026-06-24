@@ -132,6 +132,27 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     }
   };
 
+  const handleBeneficiaryAction = async (action: 'approve' | 'reject' | 'toggle' | 'delete', bid: string) => {
+    try {
+      if (action === 'approve') await api.patch(`/api/beneficiaries/approve/${bid}`);
+      else if (action === 'reject') await api.patch(`/api/beneficiaries/reject/${bid}`);
+      else if (action === 'toggle') await api.patch(`/api/beneficiaries/toggle-status/${bid}`);
+      else if (action === 'delete') await api.delete(`/api/beneficiaries/${bid}`);
+
+      // Refresh the table after the action
+      fetchBeneficiariesData();
+
+      // Close the modal
+      setSelectedBeneficiary(null);
+      setSelectedApplicant(null);
+
+      alert(`Successfully performed ${action} action.`);
+    } catch (error) {
+      console.error(`Failed to ${action} beneficiary:`, error);
+      alert(`Failed to ${action} beneficiary. Check console for details.`);
+    }
+  };
+
   useEffect(() => {
     fetchBeneficiariesData();
   }, [mode]); // Triggers when component mounts or mode switches
@@ -703,34 +724,34 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
                 {/* Profile actions */}
                 <div className="space-y-3.5">
+                  {mode === 'beneficiaries' ? (
+                    <button
+                      onClick={() => handleBeneficiaryAction('toggle', selectedBeneficiary!.id)}
+                      className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
+                      data-testid="toggle-profile-status-btn"
+                    >
+                      {selectedBeneficiary?.status === 'Active' ? 'Deactivate Profile' : 'Activate Profile'}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleBeneficiaryAction('approve', selectedApplicant!.id)}
+                        className="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm"
+                        data-testid="approve-profile-btn"
+                      >
+                        Approve Profile
+                      </button>
+                      <button
+                        onClick={() => handleBeneficiaryAction('reject', selectedApplicant!.id)}
+                        className="w-full py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-sm"
+                        data-testid="reject-profile-btn"
+                      >
+                        Reject Profile
+                      </button>
+                    </>
+                  )}
                   <button
-                    onClick={() => {
-                      if (mode === 'beneficiaries' && selectedBeneficiary) {
-                        setBeneficiaries(beneficiaries.map((b) => b.id === selectedBeneficiary.id ? { ...b, status: b.status === 'Active' ? 'Inactive' : 'Active' } : b));
-                        setSelectedBeneficiary(null);
-                      } else if (mode === 'applicants' && selectedApplicant) {
-                        setApplicants(applicants.map((a) => a.id === selectedApplicant.id ? { ...a, application_status: a.application_status === 'Approved' ? 'Pending' : 'Approved' } : a));
-                        setSelectedApplicant(null);
-                      }
-                    }}
-                    className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
-                    data-testid="toggle-profile-status-btn"
-                  >
-                    {mode === 'beneficiaries'
-                      ? ((selectedBeneficiary?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
-                      : ((selectedApplicant?.application_status === 'Approved') ? 'Mark as Pending' : 'Approve Profile')
-                    }
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (mode === 'beneficiaries' && selectedBeneficiary) {
-                        setBeneficiaries(beneficiaries.filter((b) => b.id !== selectedBeneficiary.id));
-                        setSelectedBeneficiary(null);
-                      } else if (mode === 'applicants' && selectedApplicant) {
-                        setApplicants(applicants.filter((a) => a.id !== selectedApplicant.id));
-                        setSelectedApplicant(null);
-                      }
-                    }}
+                    onClick={() => handleBeneficiaryAction('delete', selectedBeneficiary?.id || selectedApplicant!.id)}
                     className="w-full py-2.5 text-xs font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-neutral-200 hover:border-rose-600 rounded-xl transition-all shadow-sm"
                     data-testid="delete-profile-btn"
                   >
