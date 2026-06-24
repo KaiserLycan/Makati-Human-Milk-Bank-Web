@@ -375,17 +375,20 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     e.preventDefault();
 
     try {
+      const birthDate = newBeneficiaryForm.infantDob || new Date().toISOString().split('T')[0];
+
       const payload = {
         name: `${newBeneficiaryForm.infantFirstName} ${newBeneficiaryForm.infantLastName}`,
         caregiver: `${newBeneficiaryForm.parentFirstName} ${newBeneficiaryForm.parentLastName}`,
         caregiver_email: newBeneficiaryForm.email,
         caregiver_phone: newBeneficiaryForm.phone,
-        birth_date: newBeneficiaryForm.infantDob,
+        birth_date: birthDate,
         weight_kg: parseFloat(newBeneficiaryForm.infantWeight) / 1000,
         feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement),
+        address: newBeneficiaryForm.address,
         profile: {
-          prescription_details: prescriptionFile ? prescriptionFile.name : "N/A",
-          clinical_abstract: clinicalAbstractFile ? clinicalAbstractFile.name : "N/A",
+          prescription_details: null,
+          clinical_abstract: null,
         },
       };
 
