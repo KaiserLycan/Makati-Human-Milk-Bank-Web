@@ -80,9 +80,9 @@ const CustomDropdown = ({
 
 export interface RawMilkCollection {
   ctn: number;
-  donor: {
+  donor?: {
     dtn: number;
-    name: string;
+    name?: string;
   };
   program: string;
   hospital: string | null;
