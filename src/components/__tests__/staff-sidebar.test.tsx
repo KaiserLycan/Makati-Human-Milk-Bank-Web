@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import StaffSidebar from '../ui/staff-sidebar';
 import * as storage from '../../utils/storage';
 import { reloadWindow } from '../../utils/navigation';
+import { api } from '../../utils/api';
 
 // Mock next/link to prevent issues in Jest environment
 jest.mock('next/link', () => {
@@ -27,6 +28,14 @@ jest.mock('../../utils/storage', () => {
 // Mock navigation utility
 jest.mock('../../utils/navigation', () => ({
   reloadWindow: jest.fn(),
+}));
+
+// Mock api utility
+jest.mock('../../utils/api', () => ({
+  api: {
+    get: jest.fn().mockResolvedValue({ data: { data: {} } }),
+    post: jest.fn(),
+  },
 }));
 
 
@@ -175,12 +184,7 @@ describe('StaffSidebar Component', () => {
       role: 'manager',
     });
     (storage.loadUsers as jest.Mock).mockReturnValue([]);
-
-    global.fetch = (jest.fn() as jest.MockedFunction<typeof globalThis.fetch>).mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({}),
-    } as Response);
+    (api.post as jest.Mock).mockResolvedValue({ data: {} });
 
     const { waitFor } = await import('@testing-library/react');
 
@@ -190,10 +194,7 @@ describe('StaffSidebar Component', () => {
     fireEvent.click(screen.getByTestId('confirm-logout-btn'));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:5000/api/auth/logout',
-        { method: 'POST', credentials: 'include' }
-      );
+      expect(api.post).toHaveBeenCalledWith('/api/auth/logout');
     });
 
     // Confirm button is disabled while logging out
@@ -208,12 +209,10 @@ describe('StaffSidebar Component', () => {
       role: 'manager',
     });
     (storage.loadUsers as jest.Mock).mockReturnValue([]);
-
-    global.fetch = (jest.fn() as jest.MockedFunction<typeof globalThis.fetch>).mockResolvedValue({
-      ok: false,
-      status: 400,
-      json: async () => ({ error: 'Session expired.' }),
-    } as Response);
+    (api.post as jest.Mock).mockRejectedValue({
+      response: { data: { error: 'Session expired.' } },
+      message: 'Session expired.'
+    });
 
     render(<StaffSidebar activeItem="dashboard" />);
 

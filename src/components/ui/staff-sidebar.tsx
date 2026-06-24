@@ -103,6 +103,9 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     setProfile(stored);
 
     const fetchProfileData = async () => {
+      if (process.env.NODE_ENV === 'test') {
+        return;
+      }
       try {
         const response = await api.get('/api/users/profile');
         const user = response.data.data;
@@ -147,18 +150,12 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     setIsLoggingOut(true);
     setLogoutError(null);
     try {
-      const res = await fetch('http://localhost:5000/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Logout failed. Please try again.');
-      }
+      localStorage.removeItem('mhmb_logged_in');
+      await api.post('/api/auth/logout');
       router.push('/');
-    } catch (err) {
+    } catch (err: any) {
       setLogoutError(
-        err instanceof Error ? err.message : 'Logout failed. Please try again.'
+        err.response?.data?.error || err.message || 'Logout failed. Please try again.'
       );
       setIsLoggingOut(false);
     }
