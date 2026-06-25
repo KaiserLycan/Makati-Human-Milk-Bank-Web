@@ -86,6 +86,24 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const [applicants, setApplicants] = useState<ApplicantBeneficiary[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
+  // Helper to split full name into first, middle, and last components
+  const splitFullName = (fullName: string) => {
+    const parts = (fullName || '').trim().split(/\s+/);
+    if (parts.length === 0 || parts[0] === '') {
+      return { first: '', middle: '', last: '' };
+    }
+    if (parts.length === 1) {
+      return { first: parts[0], middle: '', last: '' };
+    }
+    if (parts.length === 2) {
+      return { first: parts[0], middle: '', last: parts[1] };
+    }
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    const middle = parts.slice(1, parts.length - 1).join(' ');
+    return { first, middle, last };
+  };
+
   const fetchBeneficiariesData = async () => {
     try {
       setIsLoadingData(true);
@@ -100,19 +118,23 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         return; // Stop if it's not an array
       }
 
-      const mappedData = payload.map((b: any) => ({
-        id: b.bid?.toString() || 'N/A',
-        name: b.name || 'N/A',
-        infantFirstName: b.name?.split(' ')[0] || '',
-        infantMiddleName: '',
-        infantLastName: b.name?.split(' ')[1] || '',
-        infantDob: b.birth_date ? new Date(b.birth_date).toISOString().split('T')[0] : 'N/A',
-        infantWeight: b.weight_kg?.toString() || '0',
-        feedingRequirement: b.feeding_requirement_ml?.toString() || '0',
-        parentFirstName: b.caregiver || 'N/A',
-        parentMiddleName: '',
-        parentLastName: '',
-        address: b.address || '',
+      const mappedData = payload.map((b: any) => {
+        const infantNames = splitFullName(b.name);
+        const parentNames = splitFullName(b.caregiver);
+
+        return {
+          id: b.bid?.toString() || 'N/A',
+          name: b.name || 'N/A',
+          infantFirstName: infantNames.first,
+          infantMiddleName: infantNames.middle,
+          infantLastName: infantNames.last,
+          infantDob: b.birth_date ? new Date(b.birth_date).toISOString().split('T')[0] : 'N/A',
+          infantWeight: b.weight_kg?.toString() || '0',
+          feedingRequirement: b.feeding_requirement_ml?.toString() || '0',
+          parentFirstName: parentNames.first,
+          parentMiddleName: parentNames.middle,
+          parentLastName: parentNames.last,
+          address: b.address || '',
         phone: b.caregiver_phone || '',
         email: b.caregiver_email || '',
         status: (b.account_status === 'active' ? 'Active' : 'Inactive') as 'Active' | 'Inactive' | 'Pending',
@@ -121,7 +143,8 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         clinicalAbstractFileName: b.profile?.clinical_abstract || null,
         application_status: (b.application_status === 'pending' ? 'Pending' : (b.account_status === 'active' ? 'Approved' : 'Rejected')) as 'Approved' | 'Pending' | 'Rejected',
         dateApplied: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A'
-      }));
+      };
+    });
 
       setBeneficiaries(mappedData.filter((b: any) => b.application_status !== 'Pending'));
       setApplicants(mappedData.filter((b: any) => b.application_status === 'Pending'));
