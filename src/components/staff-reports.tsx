@@ -472,7 +472,7 @@ export default function StaffReports() {
 
                   {/* Render Collection Report */}
                   {reportType === 'collection' && reportData && (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid="pdf-page-1">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid={`pdf-page-${activePage}`}>
                       <div className="space-y-4">
                         <h2 className="text-2xl font-sans font-bold text-neutral-800 leading-tight">
                           Makati Human Milk Bank Collection Report
@@ -538,7 +538,7 @@ export default function StaffReports() {
 
                   {/* Render Processing Report */}
                   {reportType === 'processing' && reportData && (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid="pdf-page-1">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid={`pdf-page-${activePage}`}>
                       <div className="space-y-4">
                         <h2 className="text-2xl font-sans font-bold text-neutral-800 leading-tight">
                           Processing & MBT Report
@@ -611,7 +611,7 @@ export default function StaffReports() {
 
                   {/* Render Dispensing Report */}
                   {reportType === 'dispensing' && reportData && (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid="pdf-page-1">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid={`pdf-page-${activePage}`}>
                       <div className="space-y-4">
                         <h2 className="text-2xl font-sans font-bold text-neutral-800 leading-tight">
                           Dispensing & Distribution Report

@@ -75,6 +75,8 @@ describe('StaffReports Component', () => {
     // Initially Page 1
     expect(screen.getByTestId('page-val')).toHaveTextContent(`1 / ${TOTAL_PAGES}`);
     expect(screen.getByTestId('pdf-page-1')).toBeInTheDocument();
+    expect(screen.getByText('Jun 22, 2026')).toBeInTheDocument();
+    expect(screen.queryByText('Jun 11, 2026')).not.toBeInTheDocument();
 
     // Click Next Page
     const nextBtn = screen.getByTestId('next-page-btn');
@@ -158,7 +160,7 @@ describe('StaffReports Component', () => {
     fireEvent.click(printBtn);
 
     // Advance time for printing mock trigger
-    act(() => {
+    await act(async () => {
       jest.advanceTimersByTime(1000);
     });
     expect(window.print).toHaveBeenCalled();
