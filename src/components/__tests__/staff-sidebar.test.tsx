@@ -30,10 +30,8 @@ jest.mock('../../utils/navigation', () => ({
   reloadWindow: jest.fn(),
 }));
 
-// Mock api utility
-jest.mock('../../utils/api', () => ({
-  api: {
-    get: jest.fn().mockResolvedValue({ data: { data: {} } }),
+jest.mock("../../utils/api", () => ({
+  api:{
     post: jest.fn(),
   },
 }));
@@ -210,8 +208,7 @@ describe('StaffSidebar Component', () => {
     });
     (storage.loadUsers as jest.Mock).mockReturnValue([]);
     (api.post as jest.Mock).mockRejectedValue({
-      response: { data: { error: 'Session expired.' } },
-      message: 'Session expired.'
+      response: { data: { error: 'Session Expired.'} },
     });
 
     render(<StaffSidebar activeItem="dashboard" />);
@@ -222,7 +219,7 @@ describe('StaffSidebar Component', () => {
 
     // Wait for error to appear
     const errorEl = await screen.findByTestId('logout-error');
-    expect(errorEl).toHaveTextContent('Session expired.');
+    expect(errorEl).toHaveTextContent('Session Expired.');
 
     // Modal should still be open
     expect(screen.getByTestId('logout-modal')).toBeInTheDocument();

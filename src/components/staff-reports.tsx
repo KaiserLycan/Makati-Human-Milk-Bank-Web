@@ -16,6 +16,7 @@ import {
   FileText,
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
+import StaffNotificationBell from './ui/staff-notification-bell';
 import { api } from '../utils/api';
 
 export default function StaffReports() {
@@ -297,16 +298,7 @@ export default function StaffReports() {
             <div className="text-neutral-500 font-sans text-xs sm:text-sm font-medium">
               {currentTime || 'Loading date...'}
             </div>
-            <Link
-              href="/work/notification"
-              className="relative p-2 text-neutral-500 hover:text-brand-teal hover:bg-neutral-100 rounded-full transition-all duration-200 shrink-0"
-              data-testid="header-notification-btn"
-              aria-label="View notifications"
-            >
-              <Bell className="size-5" />
-              <span className="absolute top-1 right-1 size-2 bg-brand-teal rounded-full animate-ping" />
-              <span className="absolute top-1 right-1 size-2 bg-brand-teal rounded-full" />
-            </Link>
+            <StaffNotificationBell />
           </div>
         </header>
 
@@ -480,7 +472,7 @@ export default function StaffReports() {
 
                   {/* Render Collection Report */}
                   {reportType === 'collection' && reportData && (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid="pdf-page-1">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid={`pdf-page-${activePage}`}>
                       <div className="space-y-4">
                         <h2 className="text-2xl font-sans font-bold text-neutral-800 leading-tight">
                           Makati Human Milk Bank Collection Report
@@ -546,7 +538,7 @@ export default function StaffReports() {
 
                   {/* Render Processing Report */}
                   {reportType === 'processing' && reportData && (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid="pdf-page-1">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid={`pdf-page-${activePage}`}>
                       <div className="space-y-4">
                         <h2 className="text-2xl font-sans font-bold text-neutral-800 leading-tight">
                           Processing & MBT Report
@@ -619,7 +611,7 @@ export default function StaffReports() {
 
                   {/* Render Dispensing Report */}
                   {reportType === 'dispensing' && reportData && (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid="pdf-page-1">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between animate-in fade-in duration-200" data-testid={`pdf-page-${activePage}`}>
                       <div className="space-y-4">
                         <h2 className="text-2xl font-sans font-bold text-neutral-800 leading-tight">
                           Dispensing & Distribution Report
