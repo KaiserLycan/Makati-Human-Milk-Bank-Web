@@ -12,6 +12,7 @@ import {
   Database,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Search,
   X,
 } from 'lucide-react';
@@ -80,6 +81,7 @@ export default function StaffNotifications() {
   // ─── Pagination State ────────────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<PageSize>(10);
+  const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false);
 
   // ─── Filter / Search State ───────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -281,7 +283,7 @@ export default function StaffNotifications() {
   const safePage = Math.min(currentPage, totalPages);
 
   const startIndex = (safePage - 1) * pageSize;           // 0-based inclusive
-  const endIndex   = Math.min(startIndex + pageSize, totalItems); // 0-based exclusive
+  const endIndex = Math.min(startIndex + pageSize, totalItems); // 0-based exclusive
 
   /** The slice of notifications visible on the current page */
   const pageItems = useMemo(
@@ -340,13 +342,13 @@ export default function StaffNotifications() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
-      
+
       {/* Sidebar Navigation */}
       <StaffSidebar activeItem="dashboard" />
 
       {/* Main Workspace Notification Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        
+
         {/* Top Header */}
         <header className="px-8 py-6 bg-white border-b border-neutral-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2 shrink-0">
           <div>
@@ -361,24 +363,24 @@ export default function StaffNotifications() {
 
         {/* Workspace Body */}
         <main className="p-8 space-y-6 flex-1 max-w-4xl w-full mx-auto">
-          
+
           {/* Navigation Back & Action Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <Link
                 href="/work/dashboard"
-                className="inline-flex items-center gap-2 text-xs font-sans font-bold text-neutral-500 hover:text-brand-teal transition-colors duration-200 group"
+                className="hidden"
                 data-testid="back-btn"
               >
-                <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5 duration-200" />
+                <ArrowLeft className="size-4" />
                 Back to Dashboard
               </Link>
-              <div className="flex items-center gap-3 mt-1.5">
+              <div className="flex items-center gap-3">
                 <h1 className="text-2xl sm:text-3xl font-sans font-bold text-neutral-900">
                   Notifications
                 </h1>
                 {unreadCount > 0 && (
-                  <span 
+                  <span
                     className="bg-brand-teal text-white text-xs font-sans font-bold px-2.5 py-0.5 rounded-full"
                     data-testid="unread-badge"
                   >
@@ -428,11 +430,10 @@ export default function StaffNotifications() {
               {/* Unread only toggle */}
               <button
                 onClick={handleUnreadToggle}
-                className={`h-10 px-4 rounded-xl border text-xs font-sans font-bold shrink-0 flex items-center gap-2 transition-all duration-150 shadow-sm ${
-                  showUnreadOnly
-                    ? 'bg-brand-teal text-white border-brand-teal'
-                    : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
-                }`}
+                className={`h-10 px-4 rounded-xl border text-xs font-sans font-bold shrink-0 flex items-center gap-2 transition-all duration-150 shadow-sm ${showUnreadOnly
+                  ? 'bg-brand-teal text-white border-brand-teal'
+                  : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                  }`}
                 data-testid="unread-filter-btn"
               >
                 <span className={`size-2 rounded-full shrink-0 ${showUnreadOnly ? 'bg-white' : 'bg-brand-teal'}`} />
@@ -446,23 +447,51 @@ export default function StaffNotifications() {
             </div>
           )}
 
-          {/* ── Gmail-style Pagination Toolbar ─────────────────────────────── */}
+          {/* Gmail-style Pagination Toolbar  */}
           {!loading && !error && totalItems > 0 && (
             <div className="flex items-center justify-between bg-white border border-neutral-200 rounded-2xl px-4 py-2.5 shadow-sm">
               {/* Left: page-size dropdown */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative">
                 <span className="text-xs text-neutral-500 font-sans font-medium">Rows per page:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => handlePageSizeChange(Number(e.target.value) as PageSize)}
-                  className="h-7 px-2 pr-6 rounded-lg text-xs font-sans font-bold text-neutral-700 bg-white border border-neutral-200 hover:border-neutral-300 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 transition-all duration-150 cursor-pointer appearance-none"
-                  data-testid="page-size-select"
-                  style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23888\' stroke-width=\'2.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center' }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    onClick={() => setPageSizeDropdownOpen(!pageSizeDropdownOpen)}
+                    className="inline-flex items-center justify-between gap-1.5 h-8 px-3 rounded-xl text-xs font-sans font-bold text-neutral-700 bg-slate-50 hover:bg-slate-100 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all duration-150 cursor-pointer"
+                    data-testid="page-size-select"
+                  >
+                    <span>{pageSize}</span>
+                    <ChevronDown className="size-3.5 text-neutral-500" />
+                  </button>
+
+                  {pageSizeDropdownOpen && (
+                    <>
+                      {/* Invisible backdrop to dismiss dropdown */}
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setPageSizeDropdownOpen(false)}
+                      />
+                      {/* Custom styled popup menu */}
+                      <div className="absolute top-full left-0 mt-1.5 w-20 bg-white border border-neutral-200/80 rounded-2xl shadow-xl p-1.5 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
+                        {PAGE_SIZE_OPTIONS.map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => {
+                              handlePageSizeChange(size);
+                              setPageSizeDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-xs font-sans rounded-xl transition-colors ${
+                              size === pageSize
+                                ? 'bg-brand-teal/10 text-brand-teal font-bold'
+                                : 'text-neutral-700 hover:bg-neutral-50 font-medium'
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Right: counter + prev/next */}
@@ -544,17 +573,16 @@ export default function StaffNotifications() {
                       <h3 className="text-xs font-sans font-bold text-neutral-400 uppercase tracking-wider pl-1">
                         {groupName}
                       </h3>
-                      
+
                       <div className="space-y-3">
                         {groupItems.map((item) => (
                           <div
                             key={item.id}
                             onClick={() => toggleRead(item.id)}
-                            className={`bg-white rounded-2xl border p-4 sm:p-5 flex items-start gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.01)] transition-all duration-200 cursor-pointer hover:border-neutral-300 hover:shadow-md ${
-                              item.read 
-                                ? 'border-neutral-200/80 opacity-75' 
-                                : 'border-brand-teal/30 bg-gradient-to-r from-brand-teal/[0.01] to-transparent ring-1 ring-brand-teal/10'
-                            }`}
+                            className={`bg-white rounded-2xl border p-4 sm:p-5 flex items-start gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.01)] transition-all duration-200 cursor-pointer hover:border-neutral-300 hover:shadow-md ${item.read
+                              ? 'border-neutral-200/80 opacity-75'
+                              : 'border-brand-teal/30 bg-gradient-to-r from-brand-teal/[0.01] to-transparent ring-1 ring-brand-teal/10'
+                              }`}
                             data-testid={`notification-card-${item.id}`}
                             aria-label={`Notification: ${item.title}`}
                           >
@@ -564,9 +592,8 @@ export default function StaffNotifications() {
                             {/* Text Content */}
                             <div className="flex-1 min-w-0 space-y-1">
                               <div className="flex items-center justify-between gap-2">
-                                <h4 className={`text-sm sm:text-base font-sans font-bold truncate ${
-                                  item.read ? 'text-neutral-700' : 'text-neutral-900'
-                                }`}>
+                                <h4 className={`text-sm sm:text-base font-sans font-bold truncate ${item.read ? 'text-neutral-700' : 'text-neutral-900'
+                                  }`}>
                                   {item.title}
                                 </h4>
                                 <span className="text-[10px] sm:text-xs text-neutral-400 font-sans shrink-0 whitespace-nowrap">
