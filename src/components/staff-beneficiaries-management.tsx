@@ -120,7 +120,11 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
       const mappedData = payload.map((b: any) => {
         const infantNames = splitFullName(b.name);
-        const parentNames = splitFullName(b.caregiver);
+        const caregiverParts = (b.caregiver || '').split('|');
+        const parentFullNameClean = caregiverParts[0] || '';
+        const extractedAddress = caregiverParts[1] ? caregiverParts[1].trim() : (b.address || '');
+
+        const parentNames = splitFullName(parentFullNameClean);
         // If the weight is stored as kg (e.g. 2.5), convert to grams (e.g. 2500)
         const weightInGrams = b.weight_kg ? (parseFloat(b.weight_kg) * 1000).toFixed(0) : '0';
 
@@ -136,7 +140,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
           parentFirstName: parentNames.first,
           parentMiddleName: parentNames.middle,
           parentLastName: parentNames.last,
-          address: b.address || '',
+          address: extractedAddress,
         phone: b.caregiver_phone || '',
         email: b.caregiver_email || '',
         status: (b.account_status === 'active' ? 'Active' : 'Inactive') as 'Active' | 'Inactive' | 'Pending',
@@ -417,14 +421,13 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       const birthDate = newBeneficiaryForm.infantDob || new Date().toISOString().split('T')[0];
 
       const payload = {
-        name: `${newBeneficiaryForm.infantFirstName} ${newBeneficiaryForm.infantLastName}`,
-        caregiver: `${newBeneficiaryForm.parentFirstName} ${newBeneficiaryForm.parentLastName}`,
+        name: `${newBeneficiaryForm.infantFirstName} ${newBeneficiaryForm.infantMiddleName ? newBeneficiaryForm.infantMiddleName + ' ' : ''}${newBeneficiaryForm.infantLastName}`.trim(),
+        caregiver: `${newBeneficiaryForm.parentFirstName} ${newBeneficiaryForm.parentMiddleName ? newBeneficiaryForm.parentMiddleName + ' ' : ''}${newBeneficiaryForm.parentLastName} | ${newBeneficiaryForm.address}`.trim(),
         caregiver_email: newBeneficiaryForm.email,
         caregiver_phone: newBeneficiaryForm.phone,
         birth_date: birthDate,
         weight_kg: parseFloat(newBeneficiaryForm.infantWeight) / 1000,
         feeding_requirement_ml: parseInt(newBeneficiaryForm.feedingRequirement),
-        address: newBeneficiaryForm.address,
         profile: {
           prescription_details: "",
           clinical_abstract: "",
@@ -506,14 +509,13 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       const existingAbstract = (selectedBeneficiary || selectedApplicant)?.clinicalAbstractFileName || "";
 
       const payload = {
-        name: `${editBeneficiaryForm.infantFirstName} ${editBeneficiaryForm.infantLastName}`,
-        caregiver: `${editBeneficiaryForm.parentFirstName} ${editBeneficiaryForm.parentLastName}`,
+        name: `${editBeneficiaryForm.infantFirstName} ${editBeneficiaryForm.infantMiddleName ? editBeneficiaryForm.infantMiddleName + ' ' : ''}${editBeneficiaryForm.infantLastName}`.trim(),
+        caregiver: `${editBeneficiaryForm.parentFirstName} ${editBeneficiaryForm.parentMiddleName ? editBeneficiaryForm.parentMiddleName + ' ' : ''}${editBeneficiaryForm.parentLastName} | ${editBeneficiaryForm.address}`.trim(),
         caregiver_email: editBeneficiaryForm.email,
         caregiver_phone: editBeneficiaryForm.phone,
         birth_date: birthDate,
         weight_kg: parseFloat(editBeneficiaryForm.infantWeight) / 1000,
         feeding_requirement_ml: parseInt(editBeneficiaryForm.feedingRequirement),
-        address: editBeneficiaryForm.address,
         profile: {
           prescription_details: editPrescriptionFile ? "" : existingPrescription,
           clinical_abstract: editClinicalAbstractFile ? "" : existingAbstract,
