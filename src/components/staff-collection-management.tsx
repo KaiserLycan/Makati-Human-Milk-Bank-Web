@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import StaffSidebar from './ui/staff-sidebar';
+import StaffNotificationBell from './ui/staff-notification-bell';
 import { api } from '../utils/api';
 
 const CustomDropdown = ({ 
@@ -514,15 +515,7 @@ export default function StaffCollectionManagement() {
             <div className="text-neutral-500 text-xs sm:text-sm font-medium">
               {currentTime || 'Loading date...'}
             </div>
-            <Link
-              href="/work/notification"
-              className="relative p-2 text-neutral-500 hover:text-brand-teal hover:bg-neutral-100 rounded-full transition-all duration-200"
-              data-testid="header-notification-btn"
-              aria-label="View notifications"
-            >
-              <Bell className="size-5" />
-              <span className="absolute top-1 right-1 size-2 bg-brand-teal rounded-full" />
-            </Link>
+            <StaffNotificationBell />
           </div>
         </header>
 
