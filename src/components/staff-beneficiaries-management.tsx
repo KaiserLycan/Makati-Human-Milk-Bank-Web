@@ -743,37 +743,48 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {pagedItems.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => mode === 'beneficiaries' ? setSelectedBeneficiary(item as Beneficiary) : setSelectedApplicant(item as ApplicantBeneficiary)}
-                      className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
-                      data-testid={`row-${item.id}`}
-                    >
-                      <td className="px-8 py-4.5 font-bold text-neutral-900">{item.id}</td>
-                      <td className="px-8 py-4.5 font-bold text-neutral-900">
-                        {getInfantFullName(item.infantFirstName, item.infantMiddleName, item.infantLastName)}
-                      </td>
-                      <td className="px-8 py-4.5 font-bold text-neutral-900">
-                        {getParentFullName(item.parentFirstName, item.parentMiddleName, item.parentLastName)}
-                      </td>
-                      <td className="px-8 py-4.5">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(mode === 'beneficiaries' ? (item as Beneficiary).status : (item as ApplicantBeneficiary).application_status)}`}>
-                          {mode === 'beneficiaries' ? (item as Beneficiary).status : (item as ApplicantBeneficiary).application_status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-4.5 text-neutral-500">
-                        {mode === 'beneficiaries' ? (item as Beneficiary).dateJoined : (item as ApplicantBeneficiary).dateApplied}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {pagedItems.length === 0 && (
+                  {isLoadingData ? (
+                    // Skeleton Loading Rows
+                    [...Array(5)].map((_, index) => (
+                      <tr key={`skeleton-${index}`} className="animate-pulse border-b border-neutral-100">
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-10"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-32"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-32"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-5 bg-neutral-100 rounded-full w-20"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-24"></div></td>
+                      </tr>
+                    ))
+                  ) : pagedItems.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-8 py-16 text-center text-neutral-400 font-medium">
                         No records match the active search and filter settings.
                       </td>
                     </tr>
+                  ) : (
+                    pagedItems.map((item) => (
+                      <tr
+                        key={item.id}
+                        onClick={() => mode === 'beneficiaries' ? setSelectedBeneficiary(item as Beneficiary) : setSelectedApplicant(item as ApplicantBeneficiary)}
+                        className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
+                        data-testid={`row-${item.id}`}
+                      >
+                        <td className="px-8 py-4.5 font-bold text-neutral-900">{item.id}</td>
+                        <td className="px-8 py-4.5 font-bold text-neutral-900">
+                          {getInfantFullName(item.infantFirstName, item.infantMiddleName, item.infantLastName)}
+                        </td>
+                        <td className="px-8 py-4.5 font-bold text-neutral-900">
+                          {getParentFullName(item.parentFirstName, item.parentMiddleName, item.parentLastName)}
+                        </td>
+                        <td className="px-8 py-4.5">
+                          <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(mode === 'beneficiaries' ? (item as Beneficiary).status : (item as ApplicantBeneficiary).application_status)}`}>
+                            {mode === 'beneficiaries' ? (item as Beneficiary).status : (item as ApplicantBeneficiary).application_status}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4.5 text-neutral-500">
+                          {mode === 'beneficiaries' ? (item as Beneficiary).dateJoined : (item as ApplicantBeneficiary).dateApplied}
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
