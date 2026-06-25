@@ -20,6 +20,7 @@ import {
   Search,
   SlidersHorizontal,
   X,
+  Check,
   User,
   MapPin,
   Phone,
@@ -85,6 +86,13 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [applicants, setApplicants] = useState<ApplicantBeneficiary[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Inline feedback toast (replaces alert())
+  const [actionFeedback, setActionFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
+    setActionFeedback({ message, type });
+    setTimeout(() => setActionFeedback(null), 3000);
+  };
 
   // Helper to split full name into first, middle, and last components
   const splitFullName = (fullName: string) => {
@@ -175,10 +183,10 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       setSelectedBeneficiary(null);
       setSelectedApplicant(null);
 
-      alert(`Successfully performed ${action} action.`);
+      showFeedback(`Successfully performed ${action} action.`, 'success');
     } catch (error) {
       console.error(`Failed to ${action} beneficiary:`, error);
-      alert(`Failed to ${action} beneficiary. Check console for details.`);
+      showFeedback(`Failed to ${action} beneficiary.`, 'error');
     }
   };
 
@@ -446,7 +454,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
       await api.post('/api/beneficiaries/register', formData);
 
-      alert("Beneficiary registered successfully!");
+      showFeedback("Beneficiary registered successfully!", 'success');
       setIsRegisterOpen(false);
 
       // Reset form
@@ -474,7 +482,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     } catch (error: any) {
       console.error("Registration failed:", error);
       const errMsg = error.response?.data?.message || "Failed to register beneficiary.";
-      alert(errMsg);
+      showFeedback(errMsg, 'error');
     }
   };
 
@@ -534,7 +542,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
       await api.put(`/api/beneficiaries/${editBeneficiaryForm.id}`, formData);
 
-      alert("Beneficiary details updated successfully!");
+      showFeedback("Beneficiary details updated successfully!", 'success');
       setIsEditOpen(false);
 
       // Close detail modals
@@ -545,7 +553,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     } catch (error: any) {
       console.error("Update failed:", error);
       const errMsg = error.response?.data?.message || "Failed to update beneficiary.";
-      alert(errMsg);
+      showFeedback(errMsg, 'error');
     }
   };
 
@@ -567,6 +575,23 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
+      {/* Toast Notification */}
+      {actionFeedback && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border transition-all duration-300 transform translate-y-0 ${
+          actionFeedback.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
+            : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
+        }`}>
+          <div className={`p-1 rounded-lg ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+            {actionFeedback.type === 'success' ? (
+              <Check className="size-4 text-emerald-600" />
+            ) : (
+              <X className="size-4 text-rose-600" />
+            )}
+          </div>
+          <span className="text-sm font-semibold">{actionFeedback.message}</span>
+        </div>
+      )}
 
       {/* Sidebar Navigation */}
       <StaffSidebar activeItem={mode === 'beneficiaries' ? 'beneficiaries' : 'applicants-beneficiaries'} />
