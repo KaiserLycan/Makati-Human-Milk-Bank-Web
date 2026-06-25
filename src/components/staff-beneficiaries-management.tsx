@@ -197,6 +197,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   // Query Filter States
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -643,29 +644,46 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
               </div>
 
               {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="size-4 text-neutral-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-3.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
-                  data-testid="status-select"
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className="flex items-center justify-between gap-2 min-w-[10rem] px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-600 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
                 >
-                  <option value="All">All Statuses</option>
-                  {mode === 'beneficiaries' ? (
-                    <>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                      <option value="Pending">Pending</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="Approved">Approved</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Rejected">Rejected</option>
-                    </>
-                  )}
-                </select>
+                  <span className="flex items-center gap-2">
+                    <SlidersHorizontal className="size-3.5 text-neutral-400" />
+                    {statusFilter === 'All' ? 'All Statuses' : statusFilter}
+                  </span>
+                  <ChevronDown className={`size-3.5 text-neutral-400 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isStatusDropdownOpen && (
+                  <div className="absolute z-20 w-full mt-1.5 bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <ul className="py-1">
+                      {(mode === 'beneficiaries'
+                        ? ['All', 'Active', 'Inactive', 'Pending']
+                        : ['All', 'Approved', 'Pending', 'Rejected']
+                      ).map((status) => (
+                        <li key={status}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusFilter(status);
+                              setIsStatusDropdownOpen(false);
+                            }}
+                            className={`block w-full text-left px-4 py-2 text-xs font-bold transition-colors ${
+                              statusFilter === status
+                                ? 'bg-brand-teal/10 text-brand-teal'
+                                : 'text-neutral-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {status === 'All' ? 'All Statuses' : status}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {/* Limit Selector */}
