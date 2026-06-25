@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   Bell,
@@ -10,20 +10,86 @@ import {
   Database,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Info
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
-import { api } from '../utils/api';// Mapped to your backend Pasteurized Milk schema
+import { api } from '../utils/api';
+
+// --- SHARED CUSTOM DROPDOWN ---
+const CustomDropdown = ({ 
+  value, 
+  onChange, 
+  options, 
+  icon: Icon, 
+  triggerClassName, 
+  dropdownClassName,
+  optionClassName,
+  disabled 
+}: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find((o: any) => o.value === value) || options[0];
+
+  return (
+    <div className="relative" ref={containerRef}>
+      {Icon && <Icon className="size-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />}
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`${triggerClassName} flex items-center justify-between gap-2 select-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span>{selectedOption?.label || value}</span>
+        <ChevronDown className={`size-3.5 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {isOpen && (
+        <div className={`absolute top-full mt-1.5 w-full bg-white border border-neutral-200 rounded-xl shadow-lg z-[60] overflow-hidden min-w-[140px] left-0 ${dropdownClassName || ''}`}>
+          {options.map((option: any) => (
+            <div
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`px-3.5 py-2.5 text-xs font-bold cursor-pointer transition-colors ${value === option.value ? 'bg-brand-teal/10 text-brand-teal' : 'text-neutral-600 hover:bg-slate-50'} ${optionClassName || ''}`}
+            >
+              {option.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- INTERFACE (Updated with full Prisma Schema fields) ---
 export interface PasteurizedBottle {
   btl_id: number;
-  volume_ml: number | string; // The console shows "500" as a string
+  pid?: number;
+  volume_ml: number | string;
   expiration_date: string;
   milk_status: string;
   mbt_status: string;
   dispense_status: string;
-  // This is the key change! The backend sends a nested object for the batch.
-  batch_milk: {
+  bottle_sequence_number?: number;
+  bottle?: string;
+  batch_milk?: {
     batch_id: number;
     processed_date: string;
+    user?: {
+      name: string;
+    };
   };
 }
 
@@ -32,6 +98,7 @@ export default function StaffInventoryManagement() {
   const [inventory, setInventory] = useState<PasteurizedBottle[]>([]);
   const [selectedItem, setSelectedItem] = useState<PasteurizedBottle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   // Filters state
   const [search, setSearch] = useState('');
@@ -41,30 +108,21 @@ export default function StaffInventoryManagement() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
-  // Fetch from backend
-const fetchInventory = useCallback(async () => {
+  const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await api.get('/api/pasteurization?limit=100');
-      
-      // Look at exactly what the backend sent us in the console
-      console.log("Raw Backend Response:", response.data);
-
-      // Defensively drill down to find the actual array
       let actualArray = response.data;
       if (actualArray && !Array.isArray(actualArray) && actualArray.data) {
         actualArray = actualArray.data;
       }
       if (actualArray && !Array.isArray(actualArray) && actualArray.data) {
-        actualArray = actualArray.data; // Handles the double-nested pagination pattern
+        actualArray = actualArray.data; 
       }
-
-      // Final safety check: if it's STILL not an array, default to an empty array so it doesn't crash
       setInventory(Array.isArray(actualArray) ? actualArray : []);
-      
     } catch (error) {
       console.error("Failed to fetch inventory:", error);
-      setInventory([]); // Prevent crash on error
+      setInventory([]);
     } finally {
       setIsLoading(false);
     }
@@ -88,7 +146,6 @@ const fetchInventory = useCallback(async () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Reset page on filter changes
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter, limit]);
@@ -102,40 +159,41 @@ const fetchInventory = useCallback(async () => {
     }
   };
 
-  // --- Update Handlers (Your Goal!) ---
-const handleUpdateIncident = async (newStatus: string) => {
+  const handleUpdateIncident = async (newStatus: string) => {
     if (!selectedItem) return;
+    setIsUpdatingStatus(true);
     try {
-      // FIX 1: Use the base update endpoint for general properties
       await api.patch(`/api/pasteurization/${selectedItem.btl_id}`, { milk_status: newStatus });
-      
       setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, milk_status: newStatus } : item));
       setSelectedItem({ ...selectedItem, milk_status: newStatus });
     } catch (error) {
       console.error("Failed to update milk status", error);
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
   const handleUpdateMBT = async (newStatus: string) => {
     if (!selectedItem) return;
+    setIsUpdatingStatus(true);
     try {
-      // FIX 2: Append '-status' to match the Swagger documentation exactly
       await api.patch(`/api/pasteurization/${selectedItem.btl_id}/mbt-status`, { mbt_status: newStatus });
-      
       setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, mbt_status: newStatus } : item));
       setSelectedItem({ ...selectedItem, mbt_status: newStatus });
     } catch (error) {
       console.error("Failed to update MBT status", error);
+    } finally {
+      setIsUpdatingStatus(false);
     }
   };
 
-  // Filter & Sort Logic
   const getProcessedInventory = () => {
     let result = [...inventory];
 
     if (search.trim() !== '') {
       result = result.filter((i) =>
-        i.btl_id.toString().includes(search) || (i.batch_milk?.batch_id && i.batch_milk.batch_id.toString().includes(search))
+        i.btl_id.toString().includes(search) || 
+        (i.batch_milk?.batch_id && i.batch_milk.batch_id.toString().includes(search))
       );
     }
 
@@ -148,8 +206,8 @@ const handleUpdateIncident = async (newStatus: string) => {
       let bVal: any = b.btl_id;
 
       if (sortBy === 'expiration_date') { aVal = a.expiration_date; bVal = b.expiration_date; }
-      if (sortBy === 'expiration_date') { aVal = a.expiration_date; bVal = b.expiration_date; }
-      if (sortBy === 'volume_ml') { aVal = a.volume_ml; bVal = b.volume_ml; }
+      if (sortBy === 'volume_ml') { aVal = Number(a.volume_ml); bVal = Number(b.volume_ml); }
+      if (sortBy === 'batch_id') { aVal = a.batch_milk?.batch_id || 0; bVal = b.batch_milk?.batch_id || 0; }
 
       if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
@@ -170,6 +228,25 @@ const handleUpdateIncident = async (newStatus: string) => {
       case 'expired':
       case 'discarded': return 'bg-rose-50 text-rose-700 border-rose-100';
       case 'dispensed': return 'bg-blue-50 text-blue-700 border-blue-100';
+      default: return 'bg-neutral-50 text-neutral-600 border-neutral-100';
+    }
+  };
+
+  const getMilkConditionBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'good': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      case 'contaminated':
+      case 'expired': return 'bg-red-50 text-red-700 border-red-100';
+      case 'discarded': return 'bg-neutral-50 text-neutral-600 border-neutral-100';
+      default: return 'bg-neutral-50 text-neutral-600 border-neutral-100';
+    }
+  };
+
+  const getMBTBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pass': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      case 'fail': return 'bg-red-50 text-red-700 border-red-100';
+      case 'pending': return 'bg-amber-50 text-amber-700 border-amber-100';
       default: return 'bg-neutral-50 text-neutral-600 border-neutral-100';
     }
   };
@@ -198,7 +275,7 @@ const handleUpdateIncident = async (newStatus: string) => {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
                 <input
                   type="text"
-                  placeholder="Search item ID or batch ID..."
+                  placeholder="Search Item ID or Batch ID..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 text-sm font-medium rounded-xl border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all placeholder:text-neutral-400"
@@ -206,33 +283,32 @@ const handleUpdateIncident = async (newStatus: string) => {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="size-4 text-neutral-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-3.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
-                  data-testid="status-select"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Available">Available</option>
-                  <option value="Expired">Expired</option>
-                  <option value="Dispensed">Dispensed</option>
-                </select>
-              </div>
+              {/* REPLACED WITH CUSTOM DROPDOWN */}
+              <CustomDropdown
+                value={statusFilter}
+                onChange={setStatusFilter}
+                icon={SlidersHorizontal}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[150px]"
+                options={[
+                  { value: 'All', label: 'All Statuses' },
+                  { value: 'Available', label: 'Available' },
+                  { value: 'Expired', label: 'Expired' },
+                  { value: 'Dispensed', label: 'Dispensed' }
+                ]}
+              />
 
+              {/* REPLACED WITH NUMBER INPUT TO MATCH COLLECTION UI */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-neutral-400">Show:</span>
-                <select
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
                   value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value))}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-2.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
-                  data-testid="limit-select"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
+                  onChange={(e) => setLimit(Number(e.target.value) || 1)}
+                  className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
+                  data-testid="limit-input"
+                />
               </div>
             </div>
           </div>
@@ -246,22 +322,32 @@ const handleUpdateIncident = async (newStatus: string) => {
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('btl_id')}>
                       Item ID {sortBy === 'btl_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('batch_number')}>
-                      Batch ID {sortBy === 'batch_number' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('batch_id')}>
+                      Batch ID {sortBy === 'batch_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-right" onClick={() => handleSort('volume_ml')}>
                       Volume {sortBy === 'volume_ml' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('pasteurization_date')}>
-                      Date Pasteurized {sortBy === 'pasteurization_date' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('expiration_date')}>
+                      Expiration Date {sortBy === 'expiration_date' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 text-center">Dispense Status</th>
                     <th className="px-6 py-4 text-center">MBT Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
+                  {/* REPLACED WITH SKELETON LOADER */}
                   {isLoading ? (
-                    <tr><td colSpan={6} className="text-center py-12 text-neutral-400">Loading records...</td></tr>
+                    [...Array(limit || 5)].map((_, i) => (
+                      <tr key={`skel-${i}`} className="animate-pulse pointer-events-none">
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5 text-right"><div className="h-4 bg-slate-200 rounded w-16 ml-auto"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
+                        <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div></td>
+                        <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-16 mx-auto"></div></td>
+                      </tr>
+                    ))
                   ) : pagedItems.map((item) => (
                     <tr
                       key={item.btl_id}
@@ -270,7 +356,7 @@ const handleUpdateIncident = async (newStatus: string) => {
                       data-testid={`row-${item.btl_id}`}
                     >
                       <td className="px-6 py-4.5 font-bold text-neutral-900">{item.btl_id}</td>
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{item.batch_milk?.batch_id || 'N/A'}</td>                      
+                      <td className="px-6 py-4.5 font-bold text-neutral-900">{item.batch_milk?.batch_id || 'N/A'}</td>
                       <td className="px-6 py-4.5 text-right font-bold text-neutral-900">{item.volume_ml} mL</td>
                       <td className="px-6 py-4.5 text-neutral-500">{item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'}</td>
                       <td className="px-6 py-4.5 text-center">
@@ -279,16 +365,20 @@ const handleUpdateIncident = async (newStatus: string) => {
                         </span>
                       </td>
                       <td className="px-6 py-4.5 text-center">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize ${
-                          item.mbt_status === 'pass' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                          item.mbt_status === 'fail' ? 'bg-rose-50 text-rose-700 border-rose-100' :
-                          'bg-amber-50 text-amber-700 border-amber-100'
-                        }`}>
+                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize ${getMBTBadge(item.mbt_status)}`}>
                           {item.mbt_status}
                         </span>
                       </td>
                     </tr>
                   ))}
+
+                  {!isLoading && pagedItems.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12 text-neutral-400">
+                        No items found matching current criteria.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -310,7 +400,7 @@ const handleUpdateIncident = async (newStatus: string) => {
       {/* ITEM DETAILS & QC MODAL */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4" data-testid="detail-modal">
-          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-2xl relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Database className="size-5 text-brand-teal" />
@@ -321,48 +411,112 @@ const handleUpdateIncident = async (newStatus: string) => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+              
+              {/* Header Info */}
               <div className="flex items-center gap-4">
                 <div className="size-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-brand-teal">
                   <Database className="size-8" />
                 </div>
                 <div>
                   <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-item-id">Bottle ID: {selectedItem.btl_id}</h4>
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Batch: <span className="text-neutral-900">{selectedItem.batch_milk?.batch_id || 'N/A'}</span></p>
+                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
+                    Batch: <span className="text-neutral-900">{selectedItem.batch_milk?.batch_id || 'N/A'}</span>
+                  </p>
                 </div>
               </div>
 
               <hr className="border-neutral-100" />
 
-              <div className="space-y-4">
-                {/* Editable Statuses */}
-                <div>
-                  <label className="block text-sm font-bold text-neutral-700 mb-2">Physical Condition (Incident Report)</label>
-                  <select 
-                    value={selectedItem.milk_status}
-                    onChange={(e) => handleUpdateIncident(e.target.value)}
-                    className="w-full text-sm border border-neutral-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal cursor-pointer bg-slate-50"
-                    data-testid="select-milk-status"
-                  >
-                    <option value="good">Good Condition</option>
-                    <option value="contaminated">Contaminated (Incident)</option>
-                    <option value="discarded">Discarded</option>
-                    <option value="expired">Expired</option>
-                  </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column: Data points to match Collection & Pool */}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Volume</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedItem.volume_ml} mL</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Expiration Date</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedItem.expiration_date ? new Date(selectedItem.expiration_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ADDED DETAILED PRISMA FIELDS HERE */}
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Bottle Type</label>
+                      <div className="text-sm font-bold text-neutral-800 capitalize">{selectedItem.bottle || 'Ameda'}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Sequence No.</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedItem.bottle_sequence_number || 'N/A'}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Date Pasteurized</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedItem.batch_milk?.processed_date ? new Date(selectedItem.batch_milk.processed_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Processed By</label>
+                      <div className="text-sm font-bold text-neutral-800 truncate" title={selectedItem.batch_milk?.user?.name || 'Unknown'}>
+                        {selectedItem.batch_milk?.user?.name || 'Unknown'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {selectedItem.pid && (
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Source Pool ID (PID)</label>
+                      <span className="px-2.5 py-1 text-[10px] font-bold border rounded-full bg-blue-50 text-blue-700 border-blue-100 uppercase tracking-wider">
+                        {selectedItem.pid}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-neutral-700 mb-2">MBT Lab Results</label>
-                  <select 
-                    value={selectedItem.mbt_status}
-                    onChange={(e) => handleUpdateMBT(e.target.value)}
-                    className="w-full text-sm border border-neutral-200 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal cursor-pointer bg-slate-50"
-                    data-testid="select-mbt-status"
-                  >
-                    <option value="pending">Pending Review</option>
-                    <option value="pass">Passed</option>
-                    <option value="fail">Failed</option>
-                  </select>
+                {/* Right Column: Updatable Statuses via CustomDropdown */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Physical Condition (Incident)</label>
+                    <CustomDropdown
+                      disabled={isUpdatingStatus}
+                      triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${getMilkConditionBadge(selectedItem.milk_status)}`}
+                      dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
+                      optionClassName="text-xs font-bold py-2 px-2 rounded-xl"
+                      value={selectedItem.milk_status}
+                      onChange={(val: string) => handleUpdateIncident(val)}
+                      options={[
+                        { value: 'good', label: 'Good Condition' },
+                        { value: 'contaminated', label: 'Contaminated (Incident)' },
+                        { value: 'discarded', label: 'Discarded' },
+                        { value: 'expired', label: 'Expired' }
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">MBT Lab Results</label>
+                    <CustomDropdown
+                      disabled={isUpdatingStatus}
+                      triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${getMBTBadge(selectedItem.mbt_status)}`}
+                      dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
+                      optionClassName="text-xs font-bold py-2 px-2 rounded-xl"
+                      value={selectedItem.mbt_status}
+                      onChange={(val: string) => handleUpdateMBT(val)}
+                      options={[
+                        { value: 'pending', label: 'Pending Review' },
+                        { value: 'pass', label: 'Passed' },
+                        { value: 'fail', label: 'Failed' }
+                      ]}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
