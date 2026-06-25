@@ -10,8 +10,7 @@ import {
   Database,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  Info
+  ChevronDown
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import { api } from '../utils/api';
@@ -73,7 +72,6 @@ const CustomDropdown = ({
   );
 };
 
-// --- INTERFACE (Updated with full Prisma Schema fields) ---
 export interface PasteurizedBottle {
   btl_id: number;
   pid?: number;
@@ -100,33 +98,49 @@ export default function StaffInventoryManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Filters state
+  // Pagination & Sorting State
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
   const [sortBy, setSortBy] = useState('btl_id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Missing Queries added to State
+  const [milkStatusFilter, setMilkStatusFilter] = useState('All');
+  const [mbtStatusFilter, setMbtStatusFilter] = useState('All');
+  const [dispenseStatusFilter, setDispenseStatusFilter] = useState('All');
 
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await api.get('/api/pasteurization?limit=100');
-      let actualArray = response.data;
-      if (actualArray && !Array.isArray(actualArray) && actualArray.data) {
-        actualArray = actualArray.data;
+      // Setup the server-side queries
+      const params: any = {
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+      };
+
+      if (search.trim()) params.search = search.trim();
+      if (milkStatusFilter !== 'All') params.milk_status = milkStatusFilter.toLowerCase();
+      if (mbtStatusFilter !== 'All') params.mbt_status = mbtStatusFilter.toLowerCase();
+      if (dispenseStatusFilter !== 'All') params.dispense_status = dispenseStatusFilter.toLowerCase();
+
+      const res = await api.get('/api/pasteurization', { params });
+      if (res.data && res.data.data) {
+        setInventory(res.data.data.data);
+        setTotalItems(res.data.data.meta.total);
+        setTotalPages(res.data.data.meta.totalPages);
       }
-      if (actualArray && !Array.isArray(actualArray) && actualArray.data) {
-        actualArray = actualArray.data; 
-      }
-      setInventory(Array.isArray(actualArray) ? actualArray : []);
     } catch (error) {
       console.error("Failed to fetch inventory:", error);
       setInventory([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [page, limit, sortBy, sortOrder, milkStatusFilter, mbtStatusFilter, dispenseStatusFilter, search]);
 
   useEffect(() => {
     fetchInventory();
@@ -146,9 +160,10 @@ export default function StaffInventoryManagement() {
     return () => clearInterval(interval);
   }, []);
 
+  // Reset to page 1 if any filter changes
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, limit]);
+  }, [search, milkStatusFilter, mbtStatusFilter, dispenseStatusFilter, limit]);
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -164,7 +179,7 @@ export default function StaffInventoryManagement() {
     setIsUpdatingStatus(true);
     try {
       await api.patch(`/api/pasteurization/${selectedItem.btl_id}`, { milk_status: newStatus });
-      setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, milk_status: newStatus } : item));
+      fetchInventory(); // Re-fetch to apply server-side filtering
       setSelectedItem({ ...selectedItem, milk_status: newStatus });
     } catch (error) {
       console.error("Failed to update milk status", error);
@@ -178,7 +193,7 @@ export default function StaffInventoryManagement() {
     setIsUpdatingStatus(true);
     try {
       await api.patch(`/api/pasteurization/${selectedItem.btl_id}/mbt-status`, { mbt_status: newStatus });
-      setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, mbt_status: newStatus } : item));
+      fetchInventory(); // Re-fetch to apply server-side filtering
       setSelectedItem({ ...selectedItem, mbt_status: newStatus });
     } catch (error) {
       console.error("Failed to update MBT status", error);
@@ -187,46 +202,12 @@ export default function StaffInventoryManagement() {
     }
   };
 
-  const getProcessedInventory = () => {
-    let result = [...inventory];
-
-    if (search.trim() !== '') {
-      result = result.filter((i) =>
-        i.btl_id.toString().includes(search) || 
-        (i.batch_milk?.batch_id && i.batch_milk.batch_id.toString().includes(search))
-      );
-    }
-
-    if (statusFilter !== 'All') {
-      result = result.filter((i) => i.dispense_status === statusFilter.toLowerCase());
-    }
-
-    result.sort((a, b) => {
-      let aVal: any = a.btl_id;
-      let bVal: any = b.btl_id;
-
-      if (sortBy === 'expiration_date') { aVal = a.expiration_date; bVal = b.expiration_date; }
-      if (sortBy === 'volume_ml') { aVal = Number(a.volume_ml); bVal = Number(b.volume_ml); }
-      if (sortBy === 'batch_id') { aVal = a.batch_milk?.batch_id || 0; bVal = b.batch_milk?.batch_id || 0; }
-
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  };
-
-  const processed = getProcessedInventory();
-  const totalItems = processed.length;
-  const totalPages = Math.ceil(totalItems / limit) || 1;
-  const pagedItems = processed.slice((page - 1) * limit, page * limit);
-
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case 'available': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       case 'expired':
       case 'discarded': return 'bg-rose-50 text-rose-700 border-rose-100';
+      case 'reserved': return 'bg-amber-50 text-amber-700 border-amber-100';
       case 'dispensed': return 'bg-blue-50 text-blue-700 border-blue-100';
       default: return 'bg-neutral-50 text-neutral-600 border-neutral-100';
     }
@@ -283,21 +264,50 @@ export default function StaffInventoryManagement() {
                 />
               </div>
 
-              {/* REPLACED WITH CUSTOM DROPDOWN */}
+              {/* Milk Status Dropdown */}
               <CustomDropdown
-                value={statusFilter}
-                onChange={setStatusFilter}
+                value={milkStatusFilter}
+                onChange={setMilkStatusFilter}
                 icon={SlidersHorizontal}
                 triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[150px]"
                 options={[
-                  { value: 'All', label: 'All Statuses' },
+                  { value: 'All', label: 'All Milk Status' },
+                  { value: 'Good', label: 'Good' },
+                  { value: 'Contaminated', label: 'Contaminated' },
+                  { value: 'Discarded', label: 'Discarded' },
+                  { value: 'Expired', label: 'Expired' }
+                ]}
+              />
+
+              {/* MBT Status Dropdown */}
+              <CustomDropdown
+                value={mbtStatusFilter}
+                onChange={setMbtStatusFilter}
+                icon={SlidersHorizontal}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[150px]"
+                options={[
+                  { value: 'All', label: 'All MBT Status' },
+                  { value: 'Pending', label: 'Pending' },
+                  { value: 'Pass', label: 'Pass' },
+                  { value: 'Fail', label: 'Fail' }
+                ]}
+              />
+
+              {/* Dispense Status Dropdown */}
+              <CustomDropdown
+                value={dispenseStatusFilter}
+                onChange={setDispenseStatusFilter}
+                icon={SlidersHorizontal}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[160px]"
+                options={[
+                  { value: 'All', label: 'All Dispense Status' },
                   { value: 'Available', label: 'Available' },
-                  { value: 'Expired', label: 'Expired' },
+                  { value: 'Reserved', label: 'Reserved' },
                   { value: 'Dispensed', label: 'Dispensed' }
                 ]}
               />
 
-              {/* REPLACED WITH NUMBER INPUT TO MATCH COLLECTION UI */}
+              {/* Limit Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-neutral-400">Show:</span>
                 <input
@@ -319,16 +329,16 @@ export default function StaffInventoryManagement() {
               <table className="w-full text-left border-collapse" data-testid="inventory-table">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('btl_id')}>
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('btl_id')}>
                       Item ID {sortBy === 'btl_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('batch_id')}>
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('batch_id')}>
                       Batch ID {sortBy === 'batch_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-right" onClick={() => handleSort('volume_ml')}>
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('volume_ml')}>
                       Volume {sortBy === 'volume_ml' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('expiration_date')}>
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('expiration_date')}>
                       Expiration Date {sortBy === 'expiration_date' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 text-center">Dispense Status</th>
@@ -336,29 +346,28 @@ export default function StaffInventoryManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {/* REPLACED WITH SKELETON LOADER */}
                   {isLoading ? (
                     [...Array(limit || 5)].map((_, i) => (
                       <tr key={`skel-${i}`} className="animate-pulse pointer-events-none">
-                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
-                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
-                        <td className="px-6 py-4.5 text-right"><div className="h-4 bg-slate-200 rounded w-16 ml-auto"></div></td>
-                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
+                        <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-16 ml-auto"></div></td>
+                        <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
                         <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div></td>
                         <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-16 mx-auto"></div></td>
                       </tr>
                     ))
-                  ) : pagedItems.map((item) => (
+                  ) : inventory.map((item) => (
                     <tr
                       key={item.btl_id}
                       onClick={() => setSelectedItem(item)}
                       className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
                       data-testid={`row-${item.btl_id}`}
                     >
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{item.btl_id}</td>
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{item.batch_milk?.batch_id || 'N/A'}</td>
-                      <td className="px-6 py-4.5 text-right font-bold text-neutral-900">{item.volume_ml} mL</td>
-                      <td className="px-6 py-4.5 text-neutral-500">{item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'}</td>
+                      <td className="px-6 py-4.5 font-bold text-neutral-900 text-left">{item.btl_id}</td>
+                      <td className="px-6 py-4.5 font-bold text-neutral-900 text-left">{item.batch_milk?.batch_id || 'N/A'}</td>
+                      <td className="px-6 py-4.5 text-left font-bold text-neutral-900">{item.volume_ml} mL</td>
+                      <td className="px-6 py-4.5 text-neutral-500 text-left">{item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'}</td>
                       <td className="px-6 py-4.5 text-center">
                         <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize ${getStatusBadge(item.dispense_status)}`}>
                           {item.dispense_status}
@@ -372,7 +381,7 @@ export default function StaffInventoryManagement() {
                     </tr>
                   ))}
 
-                  {!isLoading && pagedItems.length === 0 && (
+                  {!isLoading && inventory.length === 0 && (
                     <tr>
                       <td colSpan={6} className="text-center py-12 text-neutral-400">
                         No items found matching current criteria.
@@ -413,7 +422,6 @@ export default function StaffInventoryManagement() {
 
             <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               
-              {/* Header Info */}
               <div className="flex items-center gap-4">
                 <div className="size-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-brand-teal">
                   <Database className="size-8" />
@@ -429,7 +437,6 @@ export default function StaffInventoryManagement() {
               <hr className="border-neutral-100" />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Left Column: Data points to match Collection & Pool */}
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-5">
                     <div>
@@ -444,7 +451,6 @@ export default function StaffInventoryManagement() {
                     </div>
                   </div>
 
-                  {/* ADDED DETAILED PRISMA FIELDS HERE */}
                   <div className="grid grid-cols-2 gap-5">
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Bottle Type</label>
@@ -481,7 +487,6 @@ export default function StaffInventoryManagement() {
                   )}
                 </div>
 
-                {/* Right Column: Updatable Statuses via CustomDropdown */}
                 <div className="space-y-6">
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Physical Condition (Incident)</label>
