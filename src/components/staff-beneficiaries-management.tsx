@@ -88,10 +88,62 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // Inline feedback toast (replaces alert())
-  const [actionFeedback, setActionFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const showFeedback = (message: string, type: 'success' | 'error' = 'success') => {
+  const [actionFeedback, setActionFeedback] = useState<{ message: string | string[]; type: 'success' | 'error' } | null>(null);
+  const showFeedback = (message: string | string[], type: 'success' | 'error' = 'success') => {
     setActionFeedback({ message, type });
-    setTimeout(() => setActionFeedback(null), 3000);
+    const duration = type === 'error' && Array.isArray(message) ? 6000 : 3500;
+    setTimeout(() => setActionFeedback(null), duration);
+  };
+
+  const parseValidationErrors = (msg: string): string[] | string => {
+    if (!msg) return "";
+    
+    // Check if it's a validation error list
+    if (msg.includes("Invalid request data:") || msg.includes("request data:")) {
+      let cleanMsg = msg.replace(/^Invalid request data:\s*/, "").replace(/^request data:\s*/, "");
+      
+      // Split by comma followed by a field pattern (lowercase letters/underscores and a colon)
+      const parts = cleanMsg.split(/,\s*(?=[a-z_]+:)/);
+      const formattedErrors: string[] = [];
+      
+      const fieldMap: Record<string, string> = {
+        name: "Infant Name",
+        caregiver: "Caregiver Name/Address",
+        caregiver_email: "Email Address",
+        caregiver_phone: "Phone Number",
+        birth_date: "Date of Birth",
+        weight_kg: "Weight",
+        feeding_requirement_ml: "Feeding Requirement",
+        prescription_details: "Prescription File",
+        clinical_abstract: "Clinical Abstract File"
+      };
+
+      for (const part of parts) {
+        const colonIdx = part.indexOf(":");
+        if (colonIdx !== -1) {
+          const field = part.substring(0, colonIdx).trim();
+          let errorText = part.substring(colonIdx + 1).trim();
+          
+          const friendlyField = fieldMap[field] || field;
+          
+          if (errorText.toLowerCase().includes("invalid email")) {
+            errorText = "Please enter a valid email address.";
+          } else if (errorText.toLowerCase().includes("invalid phone")) {
+            errorText = "Please enter a valid phone number.";
+          } else if (errorText.toLowerCase().includes("must be at least 2 characters")) {
+            errorText = "Must be at least 2 characters long.";
+          }
+          
+          formattedErrors.push(`${friendlyField}: ${errorText}`);
+        } else {
+          formattedErrors.push(part.trim());
+        }
+      }
+      
+      return formattedErrors.length > 0 ? formattedErrors : msg;
+    }
+    
+    return msg;
   };
 
   // Helper to split full name into first, middle, and last components
@@ -177,16 +229,32 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       else if (action === 'delete') await api.delete(`/api/beneficiaries/${bid}`);
 
       // Refresh the table after the action
-      fetchBeneficiariesData();
+      await fetchBeneficiariesData();
 
       // Close the modal
       setSelectedBeneficiary(null);
       setSelectedApplicant(null);
 
       showFeedback(`Successfully performed ${action} action.`, 'success');
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to ${action} beneficiary:`, error);
-      showFeedback(`Failed to ${action} beneficiary.`, 'error');
+      const serverMsg = error.response?.data?.message || "";
+      const isAlreadyAction = serverMsg.includes("already") || serverMsg.includes("Already");
+      const isEmailOrStaleError = error.response?.status === 500 || isAlreadyAction;
+
+      if (isEmailOrStaleError) {
+        await fetchBeneficiariesData();
+        setSelectedBeneficiary(null);
+        setSelectedApplicant(null);
+
+        if (isAlreadyAction) {
+          showFeedback(`Application is already processed.`, 'success');
+        } else {
+          showFeedback(`Beneficiary updated, but email notification failed.`, 'success');
+        }
+      } else {
+        showFeedback(parseValidationErrors(serverMsg) || `Failed to ${action} beneficiary.`, 'error');
+      }
     }
   };
 
@@ -483,7 +551,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     } catch (error: any) {
       console.error("Registration failed:", error);
       const errMsg = error.response?.data?.message || "Failed to register beneficiary.";
-      showFeedback(errMsg, 'error');
+      showFeedback(parseValidationErrors(errMsg), 'error');
     }
   };
 
@@ -554,7 +622,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     } catch (error: any) {
       console.error("Update failed:", error);
       const errMsg = error.response?.data?.message || "Failed to update beneficiary.";
-      showFeedback(errMsg, 'error');
+      showFeedback(parseValidationErrors(errMsg), 'error');
     }
   };
 
@@ -578,19 +646,32 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
       {/* Toast Notification */}
       {actionFeedback && (
-        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border transition-all duration-300 transform translate-y-0 ${
+        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${
           actionFeedback.type === 'success'
             ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
             : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
         }`}>
-          <div className={`p-1 rounded-lg ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+          <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
             {actionFeedback.type === 'success' ? (
               <Check className="size-4 text-emerald-600" />
             ) : (
               <X className="size-4 text-rose-600" />
             )}
           </div>
-          <span className="text-sm font-semibold">{actionFeedback.message}</span>
+          <div className="flex-1 text-xs sm:text-sm font-semibold min-w-0">
+            {Array.isArray(actionFeedback.message) ? (
+              <div className="space-y-1">
+                <p className="font-bold text-rose-900">Please correct the following fields:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-rose-700 font-medium">
+                  {actionFeedback.message.map((msg, index) => (
+                    <li key={index} className="break-words">{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <span className="break-words">{actionFeedback.message}</span>
+            )}
+          </div>
         </div>
       )}
 
