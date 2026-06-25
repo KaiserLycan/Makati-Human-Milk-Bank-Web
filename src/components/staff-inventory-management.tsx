@@ -489,10 +489,15 @@ export default function StaffInventoryManagement() {
 
                 <div className="space-y-6">
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Physical Condition (Incident)</label>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">
+                      Physical Condition (Incident)
+                    </label>
                     <CustomDropdown
-                      disabled={isUpdatingStatus}
-                      triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${getMilkConditionBadge(selectedItem.milk_status)}`}
+                      // ADD THE DISPENSED CHECK HERE:
+                      disabled={isUpdatingStatus || selectedItem.dispense_status?.toLowerCase() === 'dispensed'}
+                      triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${
+                        selectedItem.dispense_status?.toLowerCase() === 'dispensed' ? 'opacity-50 bg-slate-100 border-slate-200 text-slate-500' : getMilkConditionBadge(selectedItem.milk_status)
+                      }`}
                       dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
                       optionClassName="text-xs font-bold py-2 px-2 rounded-xl"
                       value={selectedItem.milk_status}
@@ -507,10 +512,15 @@ export default function StaffInventoryManagement() {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">MBT Lab Results</label>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">
+                      MBT Lab Results
+                    </label>
                     <CustomDropdown
-                      disabled={isUpdatingStatus}
-                      triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${getMBTBadge(selectedItem.mbt_status)}`}
+                      // ADD THE DISPENSED CHECK HERE:
+                      disabled={isUpdatingStatus || selectedItem.dispense_status?.toLowerCase() === 'dispensed'}
+                      triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${
+                        selectedItem.dispense_status?.toLowerCase() === 'dispensed' ? 'opacity-50 bg-slate-100 border-slate-200 text-slate-500' : getMBTBadge(selectedItem.mbt_status)
+                      }`}
                       dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
                       optionClassName="text-xs font-bold py-2 px-2 rounded-xl"
                       value={selectedItem.mbt_status}
@@ -521,6 +531,13 @@ export default function StaffInventoryManagement() {
                         { value: 'fail', label: 'Failed' }
                       ]}
                     />
+                    
+                    {/* ADD A HELPFUL HELPER TEXT SO USERS KNOW WHY IT IS LOCKED */}
+                    {selectedItem.dispense_status?.toLowerCase() === 'dispensed' && (
+                      <p className="text-[10px] text-rose-500 font-bold mt-2 flex items-center gap-1">
+                        🔒 Locked: Item is already dispensed
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
