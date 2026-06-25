@@ -21,6 +21,8 @@ import {
   ChevronRight,
   Calendar,
   Lock,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 
@@ -347,12 +349,108 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // --- PASTE THIS NEW BLOCK HERE ---
+  // Inline feedback toast (replaces alert())
+  const [actionFeedback, setActionFeedback] = useState<{ message: string | string[]; type: 'success' | 'error' } | null>(null);
+  const showFeedback = (message: string | string[], type: 'success' | 'error' = 'success') => {
+    setActionFeedback({ message, type });
+    const duration = type === 'error' && Array.isArray(message) ? 6000 : 3500;
+    setTimeout(() => setActionFeedback(null), duration);
+  };
 
-  // This function reaches out to your backend, grabs the raw database data, 
-  // and translates it so your frontend UI can read it perfectly without crashing.
-  // This function reaches out to your backend, grabs the raw database data, 
-  // and translates it so your frontend UI can read it perfectly without crashing.
+  const parseValidationErrors = (msg: string): string[] | string => {
+    if (!msg) return "";
+    
+    // Check if it's a validation error list
+    if (msg.includes("Invalid request data:") || msg.includes("request data:")) {
+      let cleanMsg = msg.replace(/^Invalid request data:\s*/, "").replace(/^request data:\s*/, "");
+      
+      // Split by comma followed by a field pattern (lowercase letters/underscores and a colon)
+      const parts = cleanMsg.split(/,\s*(?=[a-z_]+:)/);
+      const formattedErrors: string[] = [];
+      
+      const fieldMap: Record<string, string> = {
+        name: "Name",
+        email: "Email Address",
+        phone: "Phone Number",
+        birth_date: "Date of Birth",
+        occupation: "Occupation",
+        marital_status: "Marital Status",
+        home_address: "Home Address",
+        travelled_recently: "Recent Travel",
+        country_visited: "Countries Visited",
+        purpose: "Purpose of Travel",
+        reason: "Donation Reason",
+        spouse_consent: "Spouse Consent",
+        previously_donated: "Previously Donated",
+        last_donation: "Last Donation Date",
+        place_donated: "Last Donation Place",
+        reason_for_stopping: "Reason for Stopping"
+      };
+
+      for (const part of parts) {
+        const colonIdx = part.indexOf(":");
+        if (colonIdx !== -1) {
+          const field = part.substring(0, colonIdx).trim();
+          let errorText = part.substring(colonIdx + 1).trim();
+          
+          const friendlyField = fieldMap[field] || field;
+          
+          if (errorText.toLowerCase().includes("invalid email")) {
+            errorText = "Please enter a valid email address.";
+          } else if (errorText.toLowerCase().includes("invalid phone")) {
+            errorText = "Please enter a valid phone number.";
+          } else if (errorText.toLowerCase().includes("must be at least 2 characters")) {
+            errorText = "Must be at least 2 characters long.";
+          }
+          
+          formattedErrors.push(`${friendlyField}: ${errorText}`);
+        } else {
+          formattedErrors.push(part.trim());
+        }
+      }
+      
+      return formattedErrors.length > 0 ? formattedErrors : msg;
+    }
+    
+    return msg;
+  };
+
+  const handleDonorAction = async (action: 'approve' | 'reject' | 'toggle' | 'delete', dtn: string) => {
+    try {
+      if (action === 'approve') await api.patch(`/api/donors/approve/${dtn}`);
+      else if (action === 'reject') await api.patch(`/api/donors/reject/${dtn}`);
+      else if (action === 'toggle') await api.patch(`/api/donors/toggle-status/${dtn}`);
+      else if (action === 'delete') await api.delete(`/api/donors/${dtn}`);
+
+      // Refresh the table after the action
+      await fetchAllDonors();
+
+      // Close the modal
+      setSelectedDonor(null);
+      setSelectedApplicant(null);
+
+      showFeedback(`Successfully performed ${action} action.`, 'success');
+    } catch (error: any) {
+      console.error(`Failed to ${action} donor:`, error);
+      const serverMsg = error.response?.data?.message || "";
+      const isAlreadyAction = serverMsg.includes("already") || serverMsg.includes("Already");
+      const isEmailOrStaleError = error.response?.status === 500 || isAlreadyAction;
+
+      if (isEmailOrStaleError) {
+        await fetchAllDonors();
+        setSelectedDonor(null);
+        setSelectedApplicant(null);
+
+        if (isAlreadyAction) {
+          showFeedback(`Application is already processed.`, 'success');
+        } else {
+          showFeedback(`Donor updated, but email notification failed.`, 'success');
+        }
+      } else {
+        showFeedback(parseValidationErrors(serverMsg) || `Failed to ${action} donor.`, 'error');
+      }
+    }
+  };
   const fetchAllDonors = async () => {
     try {
       setIsLoadingData(true);
@@ -462,6 +560,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   // Query Filter States
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -721,10 +820,11 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       setIsEditMode(false);
       setEditTargetId(null);
       fetchAllDonors();
-      alert("Success!");
-    } catch (error) {
+      showFeedback(isEditMode ? "Donor details updated successfully!" : "Donor registered successfully!", 'success');
+    } catch (error: any) {
       console.error("Operation failed:", error);
-      alert("Action failed. Check console for details.");
+      const serverMsg = error.response?.data?.message || "";
+      showFeedback(parseValidationErrors(serverMsg) || (isEditMode ? "Failed to update donor." : "Failed to register donor."), 'error');
     }
   };
 
@@ -746,6 +846,36 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
+      {/* Toast Notification */}
+      {actionFeedback && (
+        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${
+          actionFeedback.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
+            : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
+        }`}>
+          <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+            {actionFeedback.type === 'success' ? (
+              <Check className="size-4 text-emerald-600" />
+            ) : (
+              <X className="size-4 text-rose-600" />
+            )}
+          </div>
+          <div className="flex-1 text-xs sm:text-sm font-semibold min-w-0">
+            {Array.isArray(actionFeedback.message) ? (
+              <div className="space-y-1">
+                <p className="font-bold text-rose-900">Please correct the following fields:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-rose-700 font-medium">
+                  {actionFeedback.message.map((msg, index) => (
+                    <li key={index} className="break-words">{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <span className="break-words">{actionFeedback.message}</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Sidebar Navigation */}
       <StaffSidebar activeItem={mode === 'donors' ? 'donors' : 'applicants-donors'} />
@@ -797,29 +927,47 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               </div>
 
               {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="size-4 text-neutral-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-3.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className="flex items-center justify-between gap-2 min-w-[10rem] px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-600 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
                   data-testid="status-select"
                 >
-                  <option value="All">All Statuses</option>
-                  {mode === 'donors' ? (
-                    <>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                      <option value="Pending">Pending</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="Approved">Approved</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Rejected">Rejected</option>
-                    </>
-                  )}
-                </select>
+                  <span className="flex items-center gap-2">
+                    <SlidersHorizontal className="size-3.5 text-neutral-400" />
+                    {statusFilter === 'All' ? 'All Statuses' : statusFilter}
+                  </span>
+                  <ChevronDown className={`size-3.5 text-neutral-400 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isStatusDropdownOpen && (
+                  <div className="absolute z-20 w-full mt-1.5 bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <ul className="py-1">
+                      {(mode === 'donors'
+                        ? ['All', 'Active', 'Inactive', 'Pending']
+                        : ['All', 'Approved', 'Pending', 'Rejected']
+                      ).map((status) => (
+                        <li key={status}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusFilter(status);
+                              setIsStatusDropdownOpen(false);
+                            }}
+                            className={`block w-full text-left px-4 py-2 text-xs font-bold transition-colors ${
+                              statusFilter === status
+                                ? 'bg-brand-teal/10 text-brand-teal'
+                                : 'text-neutral-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {status === 'All' ? 'All Statuses' : status}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {/* Limit Selector */}
@@ -901,35 +1049,46 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {pagedItems.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => mode === 'donors' ? setSelectedDonor(item as Donor) : setSelectedApplicant(item as Applicant)}
-                      className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
-                      data-testid={`row-${item.id}`}
-                    >
-                      <td className="px-8 py-4.5 font-bold text-neutral-900">{item.id}</td>
-                      <td className="px-8 py-4.5 font-bold text-neutral-900">{item.name}</td>
-                      <td className="px-8 py-4.5">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status)}`}>
-                          {mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-4.5 text-neutral-500">
-                        {mode === 'donors' ? (item as Donor).dateJoined : (item as Applicant).dateApplied}
-                      </td>
-                      <td className="px-8 py-4.5 text-neutral-500">
-                        {mode === 'donors' ? (item as Donor).lastDonation : (item as Applicant).email}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {pagedItems.length === 0 && (
+                  {isLoadingData ? (
+                    // Skeleton Loading Rows
+                    [...Array(5)].map((_, index) => (
+                      <tr key={`skeleton-${index}`} className="animate-pulse border-b border-neutral-100">
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-10"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-32"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-5 bg-neutral-100 rounded-full w-20"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-24"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-24"></div></td>
+                      </tr>
+                    ))
+                  ) : pagedItems.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-8 py-16 text-center text-neutral-400 font-medium">
                         No records match the active search and filter settings.
                       </td>
                     </tr>
+                  ) : (
+                    pagedItems.map((item) => (
+                      <tr
+                        key={item.id}
+                        onClick={() => mode === 'donors' ? setSelectedDonor(item as Donor) : setSelectedApplicant(item as Applicant)}
+                        className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
+                        data-testid={`row-${item.id}`}
+                      >
+                        <td className="px-8 py-4.5 font-bold text-neutral-900">{item.id}</td>
+                        <td className="px-8 py-4.5 font-bold text-neutral-900">{item.name}</td>
+                        <td className="px-8 py-4.5">
+                          <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status)}`}>
+                            {mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status}
+                          </span>
+                        </td>
+                        <td className="px-8 py-4.5 text-neutral-500">
+                          {mode === 'donors' ? (item as Donor).dateJoined : (item as Applicant).dateApplied}
+                        </td>
+                        <td className="px-8 py-4.5 text-neutral-500">
+                          {mode === 'donors' ? (item as Donor).lastDonation : (item as Applicant).email}
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -1058,35 +1217,34 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 <div className="space-y-3.5">
 
                   {/* BUTTON 1: TOGGLE STATUS OR APPROVE */}
-                  <button
-                    onClick={async () => {
-                      const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
-                      if (!targetId) return; // Safety check
+                  {mode === 'donors' ? (
+                    <button
+                      onClick={() => handleDonorAction('toggle', selectedDonor!.id)}
+                      className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
+                      data-testid="toggle-profile-status-btn"
+                    >
+                      {selectedDonor?.status === 'Active' ? 'Deactivate Profile' : 'Activate Profile'}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleDonorAction('approve', selectedApplicant!.id)}
+                        className="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm"
+                        data-testid="approve-profile-btn"
+                      >
+                        Approve Application
+                      </button>
+                      <button
+                        onClick={() => handleDonorAction('reject', selectedApplicant!.id)}
+                        className="w-full py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-sm"
+                        data-testid="reject-profile-btn"
+                      >
+                        Reject Application
+                      </button>
+                    </>
+                  )}
 
-                      try {
-                        if (mode === 'donors') {
-                          await api.patch(`/api/donors/toggle-status/${targetId}`);
-                        } else {
-                          await api.patch(`/api/donors/approve/${targetId}`);
-                        }
-
-                        fetchAllDonors();
-                        setSelectedDonor(null);
-                        setSelectedApplicant(null);
-                      } catch (error) {
-                        console.error("Failed to update status", error);
-                        alert("Failed to update status. Check console.");
-                      }
-                    }}
-                    className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
-                  >
-                    {mode === 'donors'
-                      ? ((selectedDonor?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
-                      : 'Approve Application'
-                    }
-                  </button>
-
-                  {/* NEW BUTTON: EDIT PROFILE */}
+                  {/* EDIT PROFILE */}
                   <button
                     onClick={() => {
                       const target = mode === 'donors' ? selectedDonor : selectedApplicant;
@@ -1119,51 +1277,16 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                       setIsRegisterOpen(true);
                     }}
                     className="w-full py-2.5 text-xs font-bold text-brand-teal hover:text-white bg-white hover:bg-brand-teal border border-brand-teal/30 hover:border-brand-teal rounded-xl transition-all shadow-sm"
+                    data-testid="edit-profile-btn"
                   >
                     Edit Profile
                   </button>
 
-                  {/* BUTTON 2: REJECT APPLICANT */}
-                  {mode === 'applicants' && (
-                    <button
-                      onClick={async () => {
-                        const targetId = selectedApplicant?.id;
-                        if (!targetId) return;
-
-                        if (!window.confirm("Are you sure you want to REJECT this application?")) return;
-
-                        try {
-                          await api.patch(`/api/donors/reject/${targetId}`);
-                          fetchAllDonors();
-                          setSelectedApplicant(null);
-                        } catch (error) {
-                          console.error("Failed to reject application", error);
-                        }
-                      }}
-                      className="w-full py-2.5 text-xs font-bold text-amber-600 hover:text-white bg-white hover:bg-amber-600 border border-neutral-200 hover:border-amber-600 rounded-xl transition-all shadow-sm"
-                    >
-                      Reject Application
-                    </button>
-                  )}
-
-                  {/* BUTTON 3: PERMANENTLY DELETE */}
+                  {/* DELETE PROFILE */}
                   <button
-                    onClick={async () => {
-                      const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
-                      if (!targetId) return;
-
-                      if (!window.confirm("Are you sure you want to permanently delete this profile from the database?")) return;
-
-                      try {
-                        await api.delete(`/api/donors/${targetId}`);
-                        fetchAllDonors();
-                        setSelectedDonor(null);
-                        setSelectedApplicant(null);
-                      } catch (error) {
-                        console.error("Failed to delete profile", error);
-                      }
-                    }}
+                    onClick={() => handleDonorAction('delete', selectedDonor?.id || selectedApplicant!.id)}
                     className="w-full py-2.5 text-xs font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-neutral-200 hover:border-rose-600 rounded-xl transition-all shadow-sm"
+                    data-testid="delete-profile-btn"
                   >
                     Delete Profile
                   </button>
