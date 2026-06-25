@@ -121,6 +121,8 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       const mappedData = payload.map((b: any) => {
         const infantNames = splitFullName(b.name);
         const parentNames = splitFullName(b.caregiver);
+        // If the weight is stored as kg (e.g. 2.5), convert to grams (e.g. 2500)
+        const weightInGrams = b.weight_kg ? (parseFloat(b.weight_kg) * 1000).toFixed(0) : '0';
 
         return {
           id: b.bid?.toString() || 'N/A',
@@ -129,7 +131,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
           infantMiddleName: infantNames.middle,
           infantLastName: infantNames.last,
           infantDob: b.birth_date ? new Date(b.birth_date).toISOString().split('T')[0] : 'N/A',
-          infantWeight: b.weight_kg?.toString() || '0',
+          infantWeight: weightInGrams,
           feedingRequirement: b.feeding_requirement_ml?.toString() || '0',
           parentFirstName: parentNames.first,
           parentMiddleName: parentNames.middle,
@@ -473,18 +475,14 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     }
   };
 
-  // Open Edit Modal
   const handleOpenEditModal = (b: Beneficiary | ApplicantBeneficiary) => {
-    // If the weight is stored as kg (e.g. "3.5"), convert to grams (e.g. "3500")
-    const weightInGrams = b.infantWeight ? (parseFloat(b.infantWeight) * 1000).toString() : '';
-
     setEditBeneficiaryForm({
       id: b.id,
       infantFirstName: b.infantFirstName || '',
       infantMiddleName: b.infantMiddleName || '',
       infantLastName: b.infantLastName || '',
       infantDob: b.infantDob && b.infantDob !== 'N/A' ? b.infantDob : '',
-      infantWeight: weightInGrams,
+      infantWeight: b.infantWeight || '',
       feedingRequirement: b.feedingRequirement || '',
       parentFirstName: b.parentFirstName || '',
       parentMiddleName: b.parentMiddleName || '',
