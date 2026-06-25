@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Bell,
@@ -10,8 +10,14 @@ import {
   Users,
   Baby,
   Database,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Search,
+  X,
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
+import { api } from '../utils/api';
 
 interface NotificationItem {
   id: string;
@@ -20,8 +26,11 @@ interface NotificationItem {
   time: string;
   category: 'donor' | 'beneficiary' | 'inventory' | 'system';
   read: boolean;
-  group: 'Today' | 'Yesterday' | 'Earlier';
+  group: 'Today' | 'Yesterday' | 'Past 7 Days' | 'Past Month' | 'Past Year' | 'Past Years';
 }
+
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const;
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
 export default function StaffNotifications() {
   // Collapsible Sub-menus state
@@ -62,71 +71,246 @@ export default function StaffNotifications() {
     return () => clearInterval(interval);
   }, []);
 
+  // Loading / error states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   // Notifications State
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: '1',
-      title: 'New Donor Application',
-      description: 'Sarah Jenkins has submitted a donor application for the Walk-In (WI) program.',
-      time: '20 mins ago',
-      category: 'donor',
-      read: false,
-      group: 'Today',
-    },
-    {
-      id: '2',
-      title: 'Low Buffer Warning',
-      description: 'O-Negative milk buffer is currently at 800 ml (below threshold of 1000 ml).',
-      time: '2 hours ago',
-      category: 'inventory',
-      read: false,
-      group: 'Today',
-    },
-    {
-      id: '3',
-      title: 'New Milk Request',
-      description: 'Makati Medical Center requested 250ml of pasteurized breast milk.',
-      time: 'Yesterday at 4:15 PM',
-      category: 'beneficiary',
-      read: true,
-      group: 'Yesterday',
-    },
-    {
-      id: '4',
-      title: 'System Backup Success',
-      description: 'Daily database backup and replication completed successfully at 03:00 AM.',
-      time: 'Yesterday at 3:00 AM',
-      category: 'system',
-      read: true,
-      group: 'Yesterday',
-    },
-    {
-      id: '5',
-      title: 'Donor Approved',
-      description: "Maria Santos's application has been approved by Dr. Alice May Miller.",
-      time: '3 days ago',
-      category: 'donor',
-      read: true,
-      group: 'Earlier',
-    },
-  ]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-  // Handle Mark all as read
-  const markAllRead = () => {
+  // ─── Pagination State ────────────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(10);
+  const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false);
+
+  // ─── Filter / Search State ───────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  /** Convert a created_at timestamp to a relative string. Returns a formatted date if old. */
+  const formatRelativeTime = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return 'Unknown time';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Unknown time';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60_000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) {
+      return `Yesterday at ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    }
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (diffDays < 365) return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+
+  /** Map a created_at timestamp to one of the six display groups. */
+  const getGroup = (dateStr: string | null | undefined): NotificationItem['group'] => {
+    if (!dateStr) return 'Past Years';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return 'Past Years';
+    const now = new Date();
+
+    // Strip time for calendar-day comparisons
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfToday.getDate() - 1);
+    const start7Days = new Date(startOfToday);
+    start7Days.setDate(startOfToday.getDate() - 7);
+    const start30Days = new Date(startOfToday);
+    start30Days.setDate(startOfToday.getDate() - 30);
+    const start365Days = new Date(startOfToday);
+    start365Days.setDate(startOfToday.getDate() - 365);
+
+    if (date >= startOfToday) return 'Today';
+    if (date >= startOfYesterday) return 'Yesterday';
+    if (date >= start7Days) return 'Past 7 Days';
+    if (date >= start30Days) return 'Past Month';
+    if (date >= start365Days) return 'Past Year';
+    return 'Past Years';
+  };
+
+  /**
+   * Map the API entity_type / notification_type to one of the four UI categories.
+   */
+  const mapCategory = (
+    entityType: string,
+    notificationType: string,
+  ): NotificationItem['category'] => {
+    const t = (entityType || notificationType || '').toLowerCase();
+    if (t.includes('donor')) return 'donor';
+    if (t.includes('beneficiar') || t.includes('request') || t.includes('recipient')) return 'beneficiary';
+    if (t.includes('milk') || t.includes('inventor') || t.includes('expir') || t.includes('buffer')) return 'inventory';
+    return 'system';
+  };
+
+  // ─── Fetch notifications on mount ───────────────────────────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchNotifications = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await api.get('/api/notifications');
+
+        const raw: Array<{
+          nid: number;
+          title: string;
+          message: string;
+          is_read: boolean;
+          created_at: string;
+          notification_type: string;
+          entity_type: string;
+        }> = res.data?.data ?? res.data;
+
+        if (cancelled) return;
+
+        const mapped: NotificationItem[] = raw.map((n) => ({
+          id: String(n.nid),
+          title: n.title,
+          description: n.message,
+          time: formatRelativeTime(n.created_at),
+          category: mapCategory(n.entity_type, n.notification_type),
+          read: n.is_read,
+          group: getGroup(n.created_at),
+        }));
+
+        setNotifications(mapped);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const msg =
+          err instanceof Error ? err.message : 'Failed to load notifications.';
+        setError(msg);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchNotifications();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ─── Actions ────────────────────────────────────────────────────────────────
+
+  const markAllRead = async () => {
+    const unread = notifications.filter((n) => !n.read);
+    if (unread.length === 0) return;
+
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+    try {
+      await Promise.all(
+        unread.map((n) => api.patch(`/api/notifications/${n.id}/read`)),
+      );
+    } catch {
+      setNotifications((prev) =>
+        prev.map((n) => {
+          const wasUnread = unread.some((u) => u.id === n.id);
+          return wasUnread ? { ...n, read: false } : n;
+        }),
+      );
+    }
   };
 
-  // Toggle single read status
-  const toggleRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: !n.read } : n))
-    );
+  const toggleRead = async (id: string) => {
+    const notification = notifications.find((n) => n.id === id);
+    if (!notification) return;
+
+    if (!notification.read) {
+      // Unread → Read: call /read endpoint
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+
+      try {
+        await api.patch(`/api/notifications/${id}/read`);
+      } catch {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, read: false } : n)),
+        );
+      }
+    } else {
+      // Read → Unread: call /unread endpoint and persist to DB
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: false } : n)),
+      );
+
+      try {
+        await api.patch(`/api/notifications/${id}/unread`);
+      } catch {
+        // Revert if API call fails
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        );
+      }
+    }
   };
 
-  // Unread count
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // Render category icons
+  // ─── Filtered list (search + unread toggle) ──────────────────────────────────
+  const filteredNotifications = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return notifications.filter((n) => {
+      if (showUnreadOnly && n.read) return false;
+      if (q && !n.title.toLowerCase().includes(q) && !n.description.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [notifications, searchQuery, showUnreadOnly]);
+
+  // ─── Pagination derived values ───────────────────────────────────────────────
+
+  const totalItems = filteredNotifications.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // Clamp currentPage if notifications shrink
+  const safePage = Math.min(currentPage, totalPages);
+
+  const startIndex = (safePage - 1) * pageSize;           // 0-based inclusive
+  const endIndex = Math.min(startIndex + pageSize, totalItems); // 0-based exclusive
+
+  /** The slice of notifications visible on the current page */
+  const pageItems = useMemo(
+    () => filteredNotifications.slice(startIndex, endIndex),
+    [filteredNotifications, startIndex, endIndex],
+  );
+
+  const handlePageSizeChange = (size: PageSize) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
+    setCurrentPage(1);
+  };
+
+  const handleUnreadToggle = () => {
+    setShowUnreadOnly((prev) => !prev);
+    setCurrentPage(1);
+  };
+
+  const goToPrev = () => setCurrentPage((p) => Math.max(1, p - 1));
+  const goToNext = () => setCurrentPage((p) => Math.min(totalPages, p + 1));
+
+  // ─── Category icons ──────────────────────────────────────────────────────────
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'donor':
@@ -158,13 +342,13 @@ export default function StaffNotifications() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
-      
+
       {/* Sidebar Navigation */}
       <StaffSidebar activeItem="dashboard" />
 
       {/* Main Workspace Notification Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        
+
         {/* Top Header */}
         <header className="px-8 py-6 bg-white border-b border-neutral-200 flex flex-col sm:flex-row justify-between sm:items-center gap-2 shrink-0">
           <div>
@@ -179,24 +363,24 @@ export default function StaffNotifications() {
 
         {/* Workspace Body */}
         <main className="p-8 space-y-6 flex-1 max-w-4xl w-full mx-auto">
-          
+
           {/* Navigation Back & Action Row */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <Link
                 href="/work/dashboard"
-                className="inline-flex items-center gap-2 text-xs font-sans font-bold text-neutral-500 hover:text-brand-teal transition-colors duration-200 group"
+                className="hidden"
                 data-testid="back-btn"
               >
-                <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5 duration-200" />
+                <ArrowLeft className="size-4" />
                 Back to Dashboard
               </Link>
-              <div className="flex items-center gap-3 mt-1.5">
+              <div className="flex items-center gap-3">
                 <h1 className="text-2xl sm:text-3xl font-sans font-bold text-neutral-900">
                   Notifications
                 </h1>
                 {unreadCount > 0 && (
-                  <span 
+                  <span
                     className="bg-brand-teal text-white text-xs font-sans font-bold px-2.5 py-0.5 rounded-full"
                     data-testid="unread-badge"
                   >
@@ -218,78 +402,238 @@ export default function StaffNotifications() {
             )}
           </div>
 
+          {/* ── Filter Bar: Search + Unread toggle ─────────────────────────── */}
+          {!loading && !error && (
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Search input */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Search notifications…"
+                  className="w-full h-10 pl-9 pr-9 rounded-xl border border-neutral-200 bg-white text-sm font-sans text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal/50 transition-all duration-150 shadow-sm"
+                  data-testid="search-input"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => handleSearchChange('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400 hover:text-neutral-600 transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Unread only toggle */}
+              <button
+                onClick={handleUnreadToggle}
+                className={`h-10 px-4 rounded-xl border text-xs font-sans font-bold shrink-0 flex items-center gap-2 transition-all duration-150 shadow-sm ${showUnreadOnly
+                  ? 'bg-brand-teal text-white border-brand-teal'
+                  : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                  }`}
+                data-testid="unread-filter-btn"
+              >
+                <span className={`size-2 rounded-full shrink-0 ${showUnreadOnly ? 'bg-white' : 'bg-brand-teal'}`} />
+                Unread only
+                {showUnreadOnly && unreadCount > 0 && (
+                  <span className="ml-1 bg-white/20 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Gmail-style Pagination Toolbar  */}
+          {!loading && !error && totalItems > 0 && (
+            <div className="flex items-center justify-between bg-white border border-neutral-200 rounded-2xl px-4 py-2.5 shadow-sm">
+              {/* Left: page-size dropdown */}
+              <div className="flex items-center gap-2 relative">
+                <span className="text-xs text-neutral-500 font-sans font-medium">Rows per page:</span>
+                <div className="relative">
+                  <button
+                    onClick={() => setPageSizeDropdownOpen(!pageSizeDropdownOpen)}
+                    className="inline-flex items-center justify-between gap-1.5 h-8 px-3 rounded-xl text-xs font-sans font-bold text-neutral-700 bg-slate-50 hover:bg-slate-100 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all duration-150 cursor-pointer"
+                    data-testid="page-size-select"
+                  >
+                    <span>{pageSize}</span>
+                    <ChevronDown className="size-3.5 text-neutral-500" />
+                  </button>
+
+                  {pageSizeDropdownOpen && (
+                    <>
+                      {/* Invisible backdrop to dismiss dropdown */}
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setPageSizeDropdownOpen(false)}
+                      />
+                      {/* Custom styled popup menu */}
+                      <div className="absolute top-full left-0 mt-1.5 w-20 bg-white border border-neutral-200/80 rounded-2xl shadow-xl p-1.5 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
+                        {PAGE_SIZE_OPTIONS.map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => {
+                              handlePageSizeChange(size);
+                              setPageSizeDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-xs font-sans rounded-xl transition-colors ${
+                              size === pageSize
+                                ? 'bg-brand-teal/10 text-brand-teal font-bold'
+                                : 'text-neutral-700 hover:bg-neutral-50 font-medium'
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: counter + prev/next */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-sans font-medium text-neutral-500" data-testid="page-counter">
+                  {startIndex + 1}–{endIndex} of {totalItems}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={goToPrev}
+                    disabled={safePage === 1}
+                    className="size-7 flex items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                    aria-label="Previous page"
+                    data-testid="prev-page-btn"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button
+                    onClick={goToNext}
+                    disabled={safePage === totalPages}
+                    className="size-7 flex items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
+                    aria-label="Next page"
+                    data-testid="next-page-btn"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* List of Notifications */}
           <div className="space-y-8">
-            {['Today', 'Yesterday', 'Earlier'].map((groupName) => {
-              const groupItems = notifications.filter((n) => n.group === groupName);
-              if (groupItems.length === 0) return null;
 
-              return (
-                <div key={groupName} className="space-y-3">
-                  <h3 className="text-xs font-sans font-bold text-neutral-400 uppercase tracking-wider pl-1">
-                    {groupName}
-                  </h3>
-                  
-                  <div className="space-y-3">
-                    {groupItems.map((item) => (
-                      <div
-                        key={item.id}
-                        onClick={() => toggleRead(item.id)}
-                        className={`bg-white rounded-2xl border p-4 sm:p-5 flex items-start gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.01)] transition-all duration-200 cursor-pointer hover:border-neutral-300 hover:shadow-md ${
-                          item.read 
-                            ? 'border-neutral-200/80 opacity-75' 
-                            : 'border-brand-teal/30 bg-gradient-to-r from-brand-teal/[0.01] to-transparent ring-1 ring-brand-teal/10'
-                        }`}
-                        data-testid={`notification-card-${item.id}`}
-                        aria-label={`Notification: ${item.title}`}
-                      >
-                        {/* Icon column */}
-                        {getCategoryIcon(item.category)}
-
-                        {/* Text Content */}
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <h4 className={`text-sm sm:text-base font-sans font-bold truncate ${
-                              item.read ? 'text-neutral-700' : 'text-neutral-900'
-                            }`}>
-                              {item.title}
-                            </h4>
-                            <span className="text-[10px] sm:text-xs text-neutral-400 font-sans shrink-0 whitespace-nowrap">
-                              {item.time}
-                            </span>
-                          </div>
-                          <p className="text-xs sm:text-sm text-neutral-500 font-sans leading-relaxed">
-                            {item.description}
-                          </p>
-                        </div>
-
-                        {/* Unread dot column */}
-                        {!item.read && (
-                          <div className="pt-2 shrink-0">
-                            <span className="block size-2 bg-brand-teal rounded-full animate-pulse" data-testid={`unread-dot-${item.id}`} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
+            {/* Loading skeleton */}
+            {loading && (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-white rounded-2xl border border-neutral-200 p-5 flex items-start gap-4 animate-pulse"
+                  >
+                    <div className="size-10 bg-neutral-100 rounded-full shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-neutral-100 rounded w-1/3" />
+                      <div className="h-3 bg-neutral-100 rounded w-2/3" />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            )}
 
-            {notifications.length === 0 && (
-              <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-neutral-200 space-y-4">
-                <div className="size-12 bg-neutral-50 text-neutral-400 rounded-full flex items-center justify-center mx-auto">
-                  <Bell className="size-6" />
+            {/* Error state */}
+            {!loading && error && (
+              <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-red-200 space-y-4">
+                <div className="size-12 bg-red-50 text-red-400 rounded-full flex items-center justify-center mx-auto">
+                  <Info className="size-6" />
                 </div>
                 <div className="space-y-1">
                   <p className="font-sans font-bold text-neutral-800">
-                    All caught up!
+                    Could not load notifications
                   </p>
                   <p className="text-sm text-neutral-400 max-w-xs mx-auto">
-                    You have no notifications in your queue.
+                    {error}
                   </p>
                 </div>
               </div>
+            )}
+
+            {/* Notification groups (scoped to current page slice) */}
+            {!loading && !error && (
+              <>
+                {(['Today', 'Yesterday', 'Past 7 Days', 'Past Month', 'Past Year', 'Past Years'] as const).map((groupName) => {
+                  const groupItems = pageItems.filter((n) => n.group === groupName);
+                  if (groupItems.length === 0) return null;
+
+                  return (
+                    <div key={groupName} className="space-y-3">
+                      <h3 className="text-xs font-sans font-bold text-neutral-400 uppercase tracking-wider pl-1">
+                        {groupName}
+                      </h3>
+
+                      <div className="space-y-3">
+                        {groupItems.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => toggleRead(item.id)}
+                            className={`bg-white rounded-2xl border p-4 sm:p-5 flex items-start gap-4 shadow-[0_4px_12px_rgba(0,0,0,0.01)] transition-all duration-200 cursor-pointer hover:border-neutral-300 hover:shadow-md ${item.read
+                              ? 'border-neutral-200/80 opacity-75'
+                              : 'border-brand-teal/30 bg-gradient-to-r from-brand-teal/[0.01] to-transparent ring-1 ring-brand-teal/10'
+                              }`}
+                            data-testid={`notification-card-${item.id}`}
+                            aria-label={`Notification: ${item.title}`}
+                          >
+                            {/* Icon column */}
+                            {getCategoryIcon(item.category)}
+
+                            {/* Text Content */}
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className={`text-sm sm:text-base font-sans font-bold truncate ${item.read ? 'text-neutral-700' : 'text-neutral-900'
+                                  }`}>
+                                  {item.title}
+                                </h4>
+                                <span className="text-[10px] sm:text-xs text-neutral-400 font-sans shrink-0 whitespace-nowrap">
+                                  {item.time}
+                                </span>
+                              </div>
+                              <p className="text-xs sm:text-sm text-neutral-500 font-sans leading-relaxed">
+                                {item.description}
+                              </p>
+                            </div>
+
+                            {/* Unread dot column */}
+                            {!item.read && (
+                              <div className="pt-2 shrink-0">
+                                <span className="block size-2 bg-brand-teal rounded-full animate-pulse" data-testid={`unread-dot-${item.id}`} />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {notifications.length === 0 && (
+                  <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-neutral-200 space-y-4">
+                    <div className="size-12 bg-neutral-50 text-neutral-400 rounded-full flex items-center justify-center mx-auto">
+                      <Bell className="size-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-sans font-bold text-neutral-800">
+                        All caught up!
+                      </p>
+                      <p className="text-sm text-neutral-400 max-w-xs mx-auto">
+                        You have no notifications in your queue.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
