@@ -118,7 +118,6 @@ export default function StaffInventoryManagement() {
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Setup the server-side queries
       const params: any = {
         page,
         limit,
@@ -177,33 +176,49 @@ export default function StaffInventoryManagement() {
     }
   };
 
+  // --- TRUE OPTIMISTIC UPDATE HANDLERS ---
+  // --- TRUE OPTIMISTIC UPDATE HANDLERS ---
   const handleUpdateIncident = async (newStatus: string) => {
-    if (!selectedItem) return;
-    setIsUpdatingStatus(true);
+    if (!selectedItem || selectedItem.milk_status === newStatus) return;
+    
+    const previousStatus = selectedItem.milk_status;
+    
+    setSelectedItem({ ...selectedItem, milk_status: newStatus });
+    setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, milk_status: newStatus } : item));
+    
     try {
-      await api.patch(`/api/pasteurization/${selectedItem.btl_id}`, { milk_status: newStatus });
-      fetchInventory(); // Re-fetch to apply server-side filtering
-      setSelectedItem({ ...selectedItem, milk_status: newStatus });
-    } catch (error) {
-      console.error("Failed to update milk status", error);
-    } finally {
-      setIsUpdatingStatus(false);
+      await api.patch(`/api/pasteurization/${selectedItem.btl_id}/milk-status`, { milk_status: newStatus, remarks: '' });
+      // FIX: Removed fetchInventory() to prevent stale Redis cache from overwriting the UI
+    } catch (error: any) {
+      setSelectedItem({ ...selectedItem, milk_status: previousStatus });
+      setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, milk_status: previousStatus } : item));
+      alert(error.response?.data?.message || "Failed to update Physical Condition on the server.");
     }
   };
 
   const handleUpdateMBT = async (newStatus: string) => {
-    if (!selectedItem) return;
-    setIsUpdatingStatus(true);
+    if (!selectedItem || selectedItem.mbt_status === newStatus) return;
+    
+    const previousStatus = selectedItem.mbt_status;
+    
+    setSelectedItem({ ...selectedItem, mbt_status: newStatus });
+    setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, mbt_status: newStatus } : item));
+    
     try {
       await api.patch(`/api/pasteurization/${selectedItem.btl_id}/mbt-status`, { mbt_status: newStatus });
-      fetchInventory(); // Re-fetch to apply server-side filtering
-      setSelectedItem({ ...selectedItem, mbt_status: newStatus });
-    } catch (error) {
-      console.error("Failed to update MBT status", error);
-    } finally {
-      setIsUpdatingStatus(false);
+      // FIX: Removed fetchInventory()
+    } catch (error: any) {
+      setSelectedItem({ ...selectedItem, mbt_status: previousStatus });
+      setInventory(prev => prev.map(item => item.btl_id === selectedItem.btl_id ? { ...item, mbt_status: previousStatus } : item));
+      alert(error.response?.data?.message || "Failed to update MBT Status on the server.");
     }
   };
+
+  // Keep this function here so the compiler doesn't complain, but we are disabling the UI for it below.
+  const handleUpdateDispenseStatus = async (newStatus: string) => {
+      // Intentionally left blank as the backend has no route for manual dispense updates
+  };
+
 
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
@@ -344,6 +359,9 @@ export default function StaffInventoryManagement() {
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('expiration_date')}>
                       Expiration Date {sortBy === 'expiration_date' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
+                    <th className="px-6 py-4 text-center cursor-pointer hover:text-brand-teal" onClick={() => handleSort('milk_status')}>
+                      Physical Condition {sortBy === 'milk_status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="px-6 py-4 text-center">Dispense Status</th>
                     <th className="px-6 py-4 text-center">MBT Status</th>
                   </tr>
@@ -356,6 +374,7 @@ export default function StaffInventoryManagement() {
                         <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
                         <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-16 ml-auto"></div></td>
                         <td className="px-6 py-4.5 text-left"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
+                        <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div></td>
                         <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-20 mx-auto"></div></td>
                         <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-16 mx-auto"></div></td>
                       </tr>
@@ -372,6 +391,11 @@ export default function StaffInventoryManagement() {
                       <td className="px-6 py-4.5 text-left font-bold text-neutral-900">{item.volume_ml} mL</td>
                       <td className="px-6 py-4.5 text-neutral-500 text-left">{item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'}</td>
                       <td className="px-6 py-4.5 text-center">
+                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize ${getMilkConditionBadge(item.milk_status)}`}>
+                          {item.milk_status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4.5 text-center">
                         <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize ${getStatusBadge(item.dispense_status)}`}>
                           {item.dispense_status}
                         </span>
@@ -386,7 +410,7 @@ export default function StaffInventoryManagement() {
 
                   {!isLoading && inventory.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-neutral-400">
+                      <td colSpan={7} className="text-center py-12 text-neutral-400">
                         No items found matching current criteria.
                       </td>
                     </tr>
@@ -435,7 +459,7 @@ export default function StaffInventoryManagement() {
                   <Info className="size-5 shrink-0" />
                   <div>
                     <p className="font-bold">Locked</p>
-                    <p className="mt-0.5 opacity-90">Item is already dispensed</p>
+                    <p className="mt-0.5 opacity-90">Item is currently dispensed. Some attributes cannot be changed.</p>
                   </div>
                 </div>
               )}
@@ -507,8 +531,7 @@ export default function StaffInventoryManagement() {
                       Physical Condition (Incident)
                     </label>
                     <CustomDropdown
-                      // ADD THE DISPENSED CHECK HERE:
-                      disabled={isUpdatingStatus || selectedItem.dispense_status?.toLowerCase() === 'dispensed'}
+                      disabled={selectedItem.dispense_status?.toLowerCase() === 'dispensed'}
                       triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${
                         selectedItem.dispense_status?.toLowerCase() === 'dispensed' ? 'opacity-50 bg-slate-100 border-slate-200 text-slate-500' : getMilkConditionBadge(selectedItem.milk_status)
                       }`}
@@ -531,8 +554,7 @@ export default function StaffInventoryManagement() {
                       MBT Lab Results
                     </label>
                     <CustomDropdown
-                      // ADD THE DISPENSED CHECK HERE:
-                      disabled={isUpdatingStatus || selectedItem.dispense_status?.toLowerCase() === 'dispensed'}
+                      disabled={selectedItem.dispense_status?.toLowerCase() === 'dispensed'}
                       triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full ${
                         selectedItem.dispense_status?.toLowerCase() === 'dispensed' ? 'opacity-50 bg-slate-100 border-slate-200 text-slate-500' : getMBTBadge(selectedItem.mbt_status)
                       }`}
@@ -547,8 +569,26 @@ export default function StaffInventoryManagement() {
                       ]}
                       data-testid="select-mbt-status"
                     />
-                    
-                    {/* ADD A HELPFUL HELPER TEXT SO USERS KNOW WHY IT IS LOCKED */}
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">
+                      Dispense Status
+                    </label>
+                    <CustomDropdown
+                      disabled={true} // FORCE DISABLED
+                      triggerClassName={`px-3 py-1.5 text-xs font-bold border rounded-xl shadow-sm transition-colors w-full opacity-50 bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed`}
+                      dropdownClassName="hidden" // Hides the dropdown
+                      optionClassName="text-xs font-bold py-2 px-2 rounded-xl"
+                      value={selectedItem.dispense_status}
+                      onChange={() => {}} // Do nothing
+                      options={[
+                        { value: 'available', label: 'Available' },
+                        { value: 'reserved', label: 'Reserved' },
+                        { value: 'dispensed', label: 'Dispensed' }
+                      ]}
+                      data-testid="select-dispense-status"
+                    />
                   </div>
                 </div>
               </div>
