@@ -3,9 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Bell,
   Search,
-  SlidersHorizontal,
   X,
   History,
   ChevronLeft,
@@ -15,29 +13,55 @@ import {
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
-import {
-  loadAudits,
-  loadProfile,
-  AuditLog,
-  UserProfile,
-} from '../utils/storage';
+import { useAuth } from '../hooks/useAuth';
+import { api } from '../utils/api';
+
+interface AuditLogEntry {
+  log_id: number;
+  modified_by: string;
+  action_performed: string;
+  table_name: string;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  performed_at: string;
+  user: {
+    user_id: string;
+    name: string;
+    role: string;
+    email: string;
+  };
+}
 
 export default function StaffAuditsManagement() {
-  const [currentTime, setCurrentTime] = useState('');
-  const [audits, setAudits] = useState<AuditLog[]>([]);
-  const [selectedAudit, setSelectedAudit] = useState<AuditLog | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
 
-  // Filters state
+  const [currentTime, setCurrentTime] = useState('');
+  const [audits, setAudits] = useState<AuditLogEntry[]>([]);
+  const [selectedAudit, setSelectedAudit] = useState<AuditLogEntry | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('timestamp');
+  const [sortBy, setSortBy] = useState('performed_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
   useEffect(() => {
-    setAudits(loadAudits());
-    setProfile(loadProfile());
+    const fetchAudits = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await api.get('/api/audit-logs');
+        setAudits(response.data.data ?? response.data);
+      } catch (err: any) {
+        setError(err?.response?.data?.error || 'Failed to load audit logs.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAudits();
   }, []);
 
   useEffect(() => {
@@ -61,12 +85,10 @@ export default function StaffAuditsManagement() {
     return () => clearInterval(interval);
   }, []);
 
-  // Reset page on filter changes
   useEffect(() => {
     setPage(1);
   }, [search, limit]);
 
-  // Handle Sort Toggle
   const handleSort = (column: string) => {
     if (sortBy === column) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -76,38 +98,35 @@ export default function StaffAuditsManagement() {
     }
   };
 
-  // Filter & Sort Logic
   const getProcessedAudits = () => {
-    let result = [...audits];
+    let result = Array.isArray(audits) ? [...audits] : [];
 
-    // Search filter
     if (search.trim() !== '') {
       result = result.filter(
         (a) =>
-          a.user.toLowerCase().includes(search.toLowerCase()) ||
-          a.action.toLowerCase().includes(search.toLowerCase()) ||
-          a.details.toLowerCase().includes(search.toLowerCase()) ||
-          a.id.toLowerCase().includes(search.toLowerCase())
+          a.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
+          a.action_performed.toLowerCase().includes(search.toLowerCase()) ||
+          a.table_name.toLowerCase().includes(search.toLowerCase()) ||
+          String(a.log_id).includes(search)
       );
     }
 
-    // Sorting
     result.sort((a, b) => {
       let aVal = '';
       let bVal = '';
 
-      if (sortBy === 'timestamp') {
-        aVal = a.timestamp;
-        bVal = b.timestamp;
+      if (sortBy === 'performed_at') {
+        aVal = a.performed_at;
+        bVal = b.performed_at;
       } else if (sortBy === 'user') {
-        aVal = a.user.toLowerCase();
-        bVal = b.user.toLowerCase();
-      } else if (sortBy === 'action') {
-        aVal = a.action.toLowerCase();
-        bVal = b.action.toLowerCase();
+        aVal = a.user?.name?.toLowerCase() ?? '';
+        bVal = b.user?.name?.toLowerCase() ?? '';
+      } else if (sortBy === 'action_performed') {
+        aVal = a.action_performed.toLowerCase();
+        bVal = b.action_performed.toLowerCase();
       } else {
-        aVal = a.id;
-        bVal = b.id;
+        aVal = String(a.log_id);
+        bVal = String(b.log_id);
       }
 
       if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
@@ -123,8 +142,17 @@ export default function StaffAuditsManagement() {
   const totalPages = Math.ceil(totalItems / limit) || 1;
   const pagedItems = processed.slice((page - 1) * limit, page * limit);
 
-  // Role Protection
-  if (profile && profile.role !== 'manager') {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-neutral-400 text-sm font-medium" data-testid="auth-loading">
+          Loading...
+        </p>
+      </div>
+    );
+  }
+
+  if (user && user.role !== 'manager') {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center p-6 text-center font-sans">
         <div className="bg-slate-800 border border-slate-700/50 rounded-3xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden space-y-6">
@@ -134,7 +162,7 @@ export default function StaffAuditsManagement() {
           <div className="space-y-2">
             <h3 className="text-xl font-bold tracking-tight">Access Denied</h3>
             <p className="text-sm text-slate-400 leading-normal">
-              You do not have manager permissions to view system logs and audit records. If you require access, please contact your administrator.
+              You do not have manager permissions to view system logs and audit records.
             </p>
           </div>
           <Link
@@ -155,7 +183,6 @@ export default function StaffAuditsManagement() {
       <StaffSidebar activeItem="audits" />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        {/* Header */}
         <header className="px-8 py-6 bg-white border-b border-neutral-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0">
           <div>
             <h2 className="text-xl font-bold text-neutral-900">System Audits</h2>
@@ -168,12 +195,9 @@ export default function StaffAuditsManagement() {
           </div>
         </header>
 
-        {/* Workspace Body */}
         <main className="p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
-          {/* Action and Filter Row */}
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
             <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
-              {/* Search */}
               <div className="relative w-full max-w-xs shrink-0">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
                 <input
@@ -186,7 +210,6 @@ export default function StaffAuditsManagement() {
                 />
               </div>
 
-              {/* Limit Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-neutral-400">Show:</span>
                 <select
@@ -203,56 +226,69 @@ export default function StaffAuditsManagement() {
             </div>
           </div>
 
-          {/* List Table Card */}
+          {error && (
+            <div
+              className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 text-sm font-medium"
+              data-testid="error-message"
+            >
+              {error}
+            </div>
+          )}
+
           <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse" data-testid="audits-table">
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('id')} data-testid="th-id">
-                      Log ID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('log_id')} data-testid="th-id">
+                      Log ID {sortBy === 'log_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('timestamp')} data-testid="th-timestamp">
-                      Timestamp {sortBy === 'timestamp' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('performed_at')} data-testid="th-timestamp">
+                      Timestamp {sortBy === 'performed_at' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('user')} data-testid="th-user">
                       User {sortBy === 'user' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('action')} data-testid="th-action">
-                      Action {sortBy === 'action' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('action_performed')} data-testid="th-action">
+                      Action {sortBy === 'action_performed' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4">Details</th>
+                    <th className="px-6 py-4">Table</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {pagedItems.map((audit) => (
-                    <tr
-                      key={audit.id}
-                      onClick={() => setSelectedAudit(audit)}
-                      className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
-                      data-testid={`row-${audit.id}`}
-                    >
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{audit.id}</td>
-                      <td className="px-6 py-4.5 text-neutral-500">{audit.timestamp}</td>
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{audit.user}</td>
-                      <td className="px-6 py-4.5 text-neutral-800 font-bold">{audit.action}</td>
-                      <td className="px-6 py-4.5 text-neutral-500 font-normal truncate max-w-[200px]">{audit.details}</td>
-                    </tr>
-                  ))}
-
-                  {pagedItems.length === 0 && (
+                  {isLoading ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-neutral-400">
+                      <td colSpan={5} className="text-center py-12 text-neutral-400" data-testid="loading-state">
+                        Loading audit logs...
+                      </td>
+                    </tr>
+                  ) : pagedItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-12 text-neutral-400" data-testid="empty-state">
                         No audit records found matching current criteria.
                       </td>
                     </tr>
+                  ) : (
+                    pagedItems.map((audit) => (
+                      <tr
+                        key={audit.log_id}
+                        onClick={() => setSelectedAudit(audit)}
+                        className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
+                        data-testid={`row-${audit.log_id}`}
+                      >
+                        <td className="px-6 py-4 font-bold text-neutral-900">{audit.log_id}</td>
+                        <td className="px-6 py-4 text-neutral-500">{new Date(audit.performed_at).toLocaleString()}</td>
+                        <td className="px-6 py-4 font-bold text-neutral-900">{audit.user?.name ?? audit.modified_by}</td>
+                        <td className="px-6 py-4 text-neutral-800 font-bold">{audit.action_performed}</td>
+                        <td className="px-6 py-4 text-neutral-500 font-normal truncate max-w-[200px]">{audit.table_name}</td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
+            {!isLoading && totalPages > 1 && (
               <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
                 <span>
                   Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries
@@ -261,7 +297,7 @@ export default function StaffAuditsManagement() {
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     data-testid="prev-page-btn"
                   >
                     <ChevronLeft className="size-4" />
@@ -269,7 +305,7 @@ export default function StaffAuditsManagement() {
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     data-testid="next-page-btn"
                   >
                     <ChevronRight className="size-4" />
@@ -281,11 +317,13 @@ export default function StaffAuditsManagement() {
         </main>
       </div>
 
-      {/* AUDIT DETAILS MODAL */}
       {selectedAudit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4" data-testid="detail-modal">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4"
+          data-testid="detail-modal"
+        >
           <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
-            <div className="bg-white border-b border-neutral-200 px-6 py-4.5 flex items-center justify-between">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <History className="size-5 text-brand-teal" />
                 <h3 className="text-lg font-bold text-neutral-900">Audit Log Details</h3>
@@ -306,10 +344,10 @@ export default function StaffAuditsManagement() {
                 </div>
                 <div>
                   <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-audit-action">
-                    {selectedAudit.action}
+                    {selectedAudit.action_performed}
                   </h4>
                   <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                    Log ID: <span className="text-neutral-900" data-testid="modal-audit-id">{selectedAudit.id}</span>
+                    Log ID: <span className="text-neutral-900" data-testid="modal-audit-id">{selectedAudit.log_id}</span>
                   </p>
                 </div>
               </div>
@@ -319,18 +357,38 @@ export default function StaffAuditsManagement() {
               <div className="space-y-3.5 text-xs">
                 <div className="flex justify-between items-center">
                   <span className="text-neutral-400 font-semibold">User:</span>
-                  <span className="font-bold text-neutral-800" data-testid="modal-audit-user">{selectedAudit.user}</span>
+                  <span className="font-bold text-neutral-800" data-testid="modal-audit-user">
+                    {selectedAudit.user?.name ?? selectedAudit.modified_by}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-neutral-400 font-semibold">Timestamp:</span>
-                  <span className="font-bold text-neutral-800" data-testid="modal-audit-timestamp">{selectedAudit.timestamp}</span>
+                  <span className="font-bold text-neutral-800" data-testid="modal-audit-timestamp">
+                    {new Date(selectedAudit.performed_at).toLocaleString()}
+                  </span>
                 </div>
-                <div className="space-y-1.5 pt-2">
-                  <span className="text-neutral-400 font-semibold block">Details:</span>
-                  <p className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal" data-testid="modal-audit-details">
-                    {selectedAudit.details}
-                  </p>
+                <div className="flex justify-between items-center">
+                  <span className="text-neutral-400 font-semibold">Table:</span>
+                  <span className="font-bold text-neutral-800" data-testid="modal-audit-table">
+                    {selectedAudit.table_name}
+                  </span>
                 </div>
+                {selectedAudit.old_data && (
+                  <div className="space-y-1.5 pt-2">
+                    <span className="text-neutral-400 font-semibold block">Old Data:</span>
+                    <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto" data-testid="modal-audit-old-data">
+                      {JSON.stringify(selectedAudit.old_data, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {selectedAudit.new_data && (
+                  <div className="space-y-1.5 pt-2">
+                    <span className="text-neutral-400 font-semibold block">New Data:</span>
+                    <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto" data-testid="modal-audit-new-data">
+                      {JSON.stringify(selectedAudit.new_data, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
             </div>
           </div>
