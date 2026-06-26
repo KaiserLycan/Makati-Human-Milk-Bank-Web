@@ -167,15 +167,21 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const fetchBeneficiariesData = async () => {
     try {
       setIsLoadingData(true);
-      const response = await api.get('/api/beneficiaries');
+      
+      // Pass the current status filter to the backend if not 'All'
+      const params: any = {};
+      if (statusFilter !== 'All') {
+        params.application_status = statusFilter.toLowerCase();
+      }
 
-      // Look at the console log you provided:
+      const response = await api.get('/api/beneficiaries', { params });
+
       // response.data (the whole object) -> .data (the inner object) -> .data (the array)
       const payload = response.data?.data?.data;
 
       if (!Array.isArray(payload)) {
         console.error("Data received is not an array:", payload);
-        return; // Stop if it's not an array
+        return;
       }
 
       const mappedData = payload.map((b: any) => {
@@ -185,8 +191,13 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
         const extractedAddress = caregiverParts[1] ? caregiverParts[1].trim() : (b.address || '');
 
         const parentNames = splitFullName(parentFullNameClean);
-        // If the weight is stored as kg (e.g. 2.5), convert to grams (e.g. 2500)
         const weightInGrams = b.weight_kg ? (parseFloat(b.weight_kg) * 1000).toFixed(0) : '0';
+
+        // Fix: Explicitly determine application status from the record
+        let appStatus: 'Approved' | 'Pending' | 'Rejected' = 'Pending';
+        if (b.application_status === 'approved' || b.account_status === 'active') appStatus = 'Approved';
+        else if (b.application_status === 'rejected') appStatus = 'Rejected';
+        else if (b.application_status === 'pending') appStatus = 'Pending';
 
         return {
           id: b.bid?.toString() || 'N/A',
@@ -201,19 +212,21 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
           parentMiddleName: parentNames.middle,
           parentLastName: parentNames.last,
           address: extractedAddress,
-        phone: b.caregiver_phone || '',
-        email: b.caregiver_email || '',
-        status: (b.account_status === 'active' ? 'Active' : 'Inactive') as 'Active' | 'Inactive' | 'Pending',
-        dateJoined: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A',
-        prescriptionFileName: b.profile?.prescription_details || null,
-        clinicalAbstractFileName: b.profile?.clinical_abstract || null,
-        application_status: (b.application_status === 'pending' ? 'Pending' : (b.account_status === 'active' ? 'Approved' : 'Rejected')) as 'Approved' | 'Pending' | 'Rejected',
-        dateApplied: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A'
-      };
-    });
+          phone: b.caregiver_phone || '',
+          email: b.caregiver_email || '',
+          status: (b.account_status === 'active' ? 'Active' : 'Inactive') as 'Active' | 'Inactive' | 'Pending',
+          dateJoined: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A',
+          prescriptionFileName: b.profile?.prescription_details || null,
+          clinicalAbstractFileName: b.profile?.clinical_abstract || null,
+          application_status: appStatus,
+          dateApplied: b.joined_date ? new Date(b.joined_date).toISOString().split('T')[0] : 'N/A'
+        };
+      });
 
-      setBeneficiaries(mappedData.filter((b: any) => b.application_status !== 'Pending'));
-      setApplicants(mappedData.filter((b: any) => b.application_status === 'Pending'));
+      // Beneficiaries are only the Approved ones
+      setBeneficiaries(mappedData.filter((b: any) => b.application_status === 'Approved'));
+      // Applicants include Pending AND Rejected
+      setApplicants(mappedData.filter((b: any) => b.application_status === 'Pending' || b.application_status === 'Rejected'));
     } catch (error) {
       console.error("Failed to fetch beneficiaries:", error);
     } finally {
@@ -221,10 +234,11 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     }
   };
 
-  const handleBeneficiaryAction = async (action: 'approve' | 'reject' | 'toggle' | 'delete', bid: string) => {
+  const handleBeneficiaryAction = async (action: 'approve' | 'reject' | 'toggle' | 'delete' | 'revert', bid: string) => {
     try {
       if (action === 'approve') await api.patch(`/api/beneficiaries/approve/${bid}`);
       else if (action === 'reject') await api.patch(`/api/beneficiaries/reject/${bid}`);
+      else if (action === 'revert') await api.patch(`/api/beneficiaries/revert/${bid}`);
       else if (action === 'toggle') await api.patch(`/api/beneficiaries/toggle-status/${bid}`);
       else if (action === 'delete') await api.delete(`/api/beneficiaries/${bid}`);
 
@@ -258,10 +272,6 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
     }
   };
 
-  useEffect(() => {
-    fetchBeneficiariesData();
-  }, [mode]); // Triggers when component mounts or mode switches
-
   // Query Filter States
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -270,6 +280,10 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
+
+  useEffect(() => {
+    fetchBeneficiariesData();
+  }, [mode, statusFilter]); // Re-fetch when mode or dropdown filter changes
 
   // Selected item for Detail Modal
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<Beneficiary | null>(null);
@@ -455,6 +469,9 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       } else if (sortBy === 'parentName') {
         aVal = getParentFullName(a.parentFirstName, a.parentMiddleName, a.parentLastName).toLowerCase();
         bVal = getParentFullName(b.parentFirstName, b.parentMiddleName, b.parentLastName).toLowerCase();
+      } else if (sortBy === 'application_status') {
+        aVal = (a.application_status || '').toLowerCase();
+        bVal = (b.application_status || '').toLowerCase();
       } else {
         const field = a[sortBy as keyof ApplicantBeneficiary];
         aVal = typeof field === 'string' ? field.toLowerCase() : '';
@@ -1022,20 +1039,38 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                     </button>
                   ) : (
                     <>
-                      <button
-                        onClick={() => handleBeneficiaryAction('approve', selectedApplicant!.id)}
-                        className="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm"
-                        data-testid="approve-profile-btn"
-                      >
-                        Approve Profile
-                      </button>
-                      <button
-                        onClick={() => handleBeneficiaryAction('reject', selectedApplicant!.id)}
-                        className="w-full py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-sm"
-                        data-testid="reject-profile-btn"
-                      >
-                        Reject Profile
-                      </button>
+                      {(selectedApplicant?.application_status === 'Pending' || selectedApplicant?.application_status === 'Rejected') && (
+                        <button
+                          onClick={() => handleBeneficiaryAction('approve', selectedApplicant!.id)}
+                          className="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                          data-testid="approve-profile-btn"
+                        >
+                          <Check className="size-3.5" />
+                          Approve Profile
+                        </button>
+                      )}
+                      
+                      {selectedApplicant?.application_status === 'Pending' && (
+                        <button
+                          onClick={() => handleBeneficiaryAction('reject', selectedApplicant!.id)}
+                          className="w-full py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                          data-testid="reject-profile-btn"
+                        >
+                          <X className="size-3.5" />
+                          Reject Profile
+                        </button>
+                      )}
+
+                      {selectedApplicant?.application_status === 'Rejected' && (
+                        <button
+                          onClick={() => handleBeneficiaryAction('revert', selectedApplicant!.id)}
+                          className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                          data-testid="revert-profile-btn"
+                        >
+                          <History className="size-3.5" />
+                          Revert to Pending
+                        </button>
+                      )}
                     </>
                   )}
                   <button
