@@ -7,10 +7,11 @@ import {
   Search,
   SlidersHorizontal,
   X,
-  Database,
+  Milk,
   ChevronLeft,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Info
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import { api } from '../utils/api';
@@ -24,7 +25,8 @@ const CustomDropdown = ({
   triggerClassName, 
   dropdownClassName,
   optionClassName,
-  disabled 
+  disabled,
+  'data-testid': testId
 }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +47,7 @@ const CustomDropdown = ({
     <div className="relative" ref={containerRef}>
       {Icon && <Icon className="size-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />}
       <div
+        data-testid={testId}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`${triggerClassName} flex items-center justify-between gap-2 select-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
@@ -409,22 +412,26 @@ export default function StaffInventoryManagement() {
       {/* ITEM DETAILS & QC MODAL */}
       {selectedItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4" data-testid="detail-modal">
-          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-2xl relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
-            <div className="bg-white border-b border-neutral-200 px-6 py-4.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Database className="size-5 text-brand-teal" />
-                <h3 className="text-lg font-bold text-neutral-900">Inventory QC Actions</h3>
-              </div>
-              <button onClick={() => setSelectedItem(null)} className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all" data-testid="close-detail-modal-btn">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50 rounded-t-3xl">
+              <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
+                <Milk className="size-6 text-brand-teal" />
+                Pastuerized Milk
+              </h3>
+              <button
+                onClick={() => setSelectedItem(null)}
+                className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-full transition-colors"
+                data-testid="close-detail-modal-btn"
+              >
                 <X className="size-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+            <div className="p-6 space-y-6">
               
               <div className="flex items-center gap-4">
                 <div className="size-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-brand-teal">
-                  <Database className="size-8" />
+                  <Milk className="size-8" />
                 </div>
                 <div>
                   <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-item-id">Bottle ID: {selectedItem.btl_id}</h4>
@@ -435,6 +442,17 @@ export default function StaffInventoryManagement() {
               </div>
 
               <hr className="border-neutral-100" />
+
+              {/* Contextual Locked/Dispensed Alert */}
+              {selectedItem.dispense_status?.toLowerCase() === 'dispensed' && (
+                <div className="p-4 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-2xl flex items-start gap-3" data-testid="item-dispensed-alert">
+                  <Info className="size-5 shrink-0" />
+                  <div>
+                    <p className="font-bold">Locked</p>
+                    <p className="mt-0.5 opacity-90">Item is already dispensed</p>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
@@ -508,6 +526,7 @@ export default function StaffInventoryManagement() {
                         { value: 'discarded', label: 'Discarded' },
                         { value: 'expired', label: 'Expired' }
                       ]}
+                      data-testid="select-milk-status"
                     />
                   </div>
 
@@ -530,20 +549,16 @@ export default function StaffInventoryManagement() {
                         { value: 'pass', label: 'Passed' },
                         { value: 'fail', label: 'Failed' }
                       ]}
+                      data-testid="select-mbt-status"
                     />
                     
                     {/* ADD A HELPFUL HELPER TEXT SO USERS KNOW WHY IT IS LOCKED */}
-                    {selectedItem.dispense_status?.toLowerCase() === 'dispensed' && (
-                      <p className="text-[10px] text-rose-500 font-bold mt-2 flex items-center gap-1">
-                        🔒 Locked: Item is already dispensed
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>
             </div>
             
-            <div className="bg-slate-50 px-6 py-4 flex justify-end border-t border-neutral-100">
+            <div className="bg-slate-50 px-6 py-4 flex justify-end border-t border-neutral-100 rounded-b-3xl">
               <button 
                 onClick={() => setSelectedItem(null)}
                 className="bg-white border border-neutral-200 text-neutral-700 px-6 py-2 rounded-xl font-bold hover:bg-neutral-50 transition-colors shadow-sm"
