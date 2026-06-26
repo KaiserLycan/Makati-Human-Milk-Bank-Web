@@ -47,27 +47,43 @@ export default function StaffAuditsManagement() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
+  const [serverTotalItems, setServerTotalItems] = useState(0);
+  const [serverTotalPages, setServerTotalPages] = useState(1);
+
   useEffect(() => {
     const fetchAudits = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const response = await api.get('/api/audit-logs');
-        console.log("Raw Audit API Response:", response.data);
+        const response = await api.get('/api/audit-logs',{
+          params: {
+            page: page,
+            limit: limit
+          }
+        });
 
         const fetchedData = response.data?.data?.data || [];
-        
+        const meta = response.data?.data?.meta;
+
         setAudits(Array.isArray(fetchedData) ? fetchedData : []);
+
+        if (meta){
+          setServerTotalItems(meta.total || 0);
+          setServerTotalPages(meta.totalPages || 1);
+        }
 
       } catch (err: any) {
         setError(err?.response?.data?.error || 'Failed to load audit logs.');
+        setAudits([]);
+        setServerTotalItems(0);
+        setServerTotalPages(1);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchAudits();
-  }, []);
+  }, [page,limit]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -142,10 +158,10 @@ export default function StaffAuditsManagement() {
     return result;
   };
 
-  const processed = getProcessedAudits();
-  const totalItems = processed.length;
-  const totalPages = Math.ceil(totalItems / limit) || 1;
-  const pagedItems = processed.slice((page - 1) * limit, page * limit);
+
+  const pagedItems = getProcessedAudits();
+  const totalItems = serverTotalItems;
+  const totalPages = serverTotalPages;
 
   if (authLoading) {
     return (
