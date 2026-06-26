@@ -430,13 +430,14 @@ export default function StaffRequestsManagement() {
               </div>
             </div>
 
+
             <button
-              onClick={() => setIsRegisterOpen(true)}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all duration-200 shrink-0 shadow-[0_4px_12px_rgba(0,105,111,0.15)] hover:shadow-lg hover:-translate-y-0.5"
-            >
-              <Plus className="size-4 stroke-[3px]" />
-              New Request
-            </button>
+                            onClick={() => setIsRegisterOpen(true)}
+                            className="px-5 py-2.5 text-sm font-bold text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap"
+                          >
+                            <Plus className="size-4" />
+                            New Request
+                          </button>
           </div>
 
           {/* List Table Card */}
@@ -446,7 +447,7 @@ export default function StaffRequestsManagement() {
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('rid')}>
-                      Req ID {sortBy === 'rid' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      ID {sortBy === 'rid' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('bid')}>
                       Beneficiary {sortBy === 'bid' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -663,7 +664,7 @@ export default function StaffRequestsManagement() {
               )}
               
               <div className="space-y-1.5">
-                <label className="text-neutral-500">Request ID</label>
+                <label className="text-neutral-500">ID</label>
                 <input
                   type="text"
                   disabled
@@ -752,7 +753,7 @@ export default function StaffRequestsManagement() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Request ID</label>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">ID</label>
                       <div className="text-sm font-bold text-neutral-800">{selectedRequest.rid}</div>
                     </div>
                     <div>
