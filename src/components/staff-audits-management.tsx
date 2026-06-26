@@ -53,7 +53,12 @@ export default function StaffAuditsManagement() {
         setIsLoading(true);
         setError(null);
         const response = await api.get('/api/audit-logs');
-        setAudits(response.data.data ?? response.data);
+        console.log("Raw Audit API Response:", response.data);
+
+        const fetchedData = response.data?.data?.data || [];
+        
+        setAudits(Array.isArray(fetchedData) ? fetchedData : []);
+
       } catch (err: any) {
         setError(err?.response?.data?.error || 'Failed to load audit logs.');
       } finally {
