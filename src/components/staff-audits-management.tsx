@@ -435,42 +435,50 @@ export default function StaffAuditsManagement() {
               </button>
             </div>
             <div className="p-6 space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="size-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-brand-teal">
-                  <History className="size-8" />
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">User</label>
+                    <div className="text-sm font-bold text-neutral-800 break-words">
+                      {selectedAudit.user?.name ?? selectedAudit.modified_by}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Timestamp</label>
+                    <div className="text-sm font-bold text-neutral-800">
+                      {new Date(selectedAudit.performed_at).toLocaleString()}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-neutral-950 text-base">{selectedAudit.action_performed}</h4>
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                    Log ID: <span className="text-neutral-900">{selectedAudit.log_id}</span>
-                  </p>
+
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Table Affected</label>
+                    <div className="text-sm font-bold text-neutral-800">
+                      {selectedAudit.table_name}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Action Performed</label>
+                    <div className="text-sm font-bold text-neutral-800">
+                      {selectedAudit.action_performed}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <hr className="border-neutral-100" />
-              <div className="space-y-3.5 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">User:</span>
-                  <span className="font-bold text-neutral-800">{selectedAudit.user?.name ?? selectedAudit.modified_by}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Timestamp:</span>
-                  <span className="font-bold text-neutral-800">{new Date(selectedAudit.performed_at).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Table:</span>
-                  <span className="font-bold text-neutral-800">{selectedAudit.table_name}</span>
-                </div>
+
+                {/* JSON Data blocks take up full width below the grid */}
                 {selectedAudit.old_data && (
-                  <div className="space-y-1.5 pt-2">
-                    <span className="text-neutral-400 font-semibold block">Old Data:</span>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Old Data</label>
                     <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto">
                       {JSON.stringify(selectedAudit.old_data, null, 2)}
                     </pre>
                   </div>
                 )}
+                
                 {selectedAudit.new_data && (
-                  <div className="space-y-1.5 pt-2">
-                    <span className="text-neutral-400 font-semibold block">New Data:</span>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">New Data</label>
                     <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto">
                       {JSON.stringify(selectedAudit.new_data, null, 2)}
                     </pre>
