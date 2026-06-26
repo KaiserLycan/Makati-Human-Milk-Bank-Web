@@ -84,7 +84,8 @@ describe('StaffReports Component', () => {
 
     // Page 2
     expect(screen.getByTestId('page-val')).toHaveTextContent(`2 / ${TOTAL_PAGES}`);
-    expect(screen.queryByTestId('pdf-page-1')).toBeInTheDocument(); // same testid, different content
+    expect(screen.queryByTestId('pdf-page-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('pdf-page-2')).toBeInTheDocument();
     // Page 2 shows the pagination subtitle for the collection table
     expect(screen.getByText(`Milk Collections Records (Page 2 of ${TOTAL_PAGES})`)).toBeInTheDocument();
 
@@ -105,9 +106,9 @@ describe('StaffReports Component', () => {
     const page2Btn = screen.getByTestId('outline-page-2');
     fireEvent.click(page2Btn);
 
-    // Page 2 — same pdf-page-1 testid, but page-val and content differ
+    // Page 2
     expect(screen.getByTestId('page-val')).toHaveTextContent(`2 / ${TOTAL_PAGES}`);
-    expect(screen.getByTestId('pdf-page-1')).toBeInTheDocument();
+    expect(screen.getByTestId('pdf-page-2')).toBeInTheDocument();
     expect(screen.getByText(`Milk Collections Records (Page 2 of ${TOTAL_PAGES})`)).toBeInTheDocument();
   });
 
