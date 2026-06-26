@@ -823,6 +823,7 @@ export default function StaffRequestsManagement() {
               </div>
             </div>
 
+            {/* Modal Footer (Mirrored from Pool Management) */}
             <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50 shrink-0">
               <button
                 onClick={() => setConfirmAction('delete')}
@@ -843,9 +844,9 @@ export default function StaffRequestsManagement() {
               {['waiting', 'allocated'].includes(selectedRequest.request_status?.toLowerCase()) && (
                 <button
                   onClick={() => setConfirmAction('cancel')}
-                  className="px-6 py-3 text-amber-600 hover:bg-amber-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 ml-2"
+                  className="px-6 py-3 text-amber-600 hover:bg-amber-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
                 >
-                  <XCircle className="size-4" /> Cancel Request
+                  <XCircle className="size-4" /> Cancel
                 </button>
               )}
 
@@ -854,7 +855,7 @@ export default function StaffRequestsManagement() {
                   onClick={() => setConfirmAction('dispense')}
                   className="px-6 py-3 text-white bg-brand-teal hover:bg-brand-teal/90 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-brand-teal/20"
                 >
-                  <CheckCircle2 className="size-4" /> Dispense & Fulfill
+                  <CheckCircle2 className="size-4" /> Dispense
                 </button>
               )}
 
