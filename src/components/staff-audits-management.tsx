@@ -10,7 +10,6 @@ import {
   ChevronRight,
   ShieldAlert,
   ArrowRight,
-  Database,
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
@@ -42,30 +41,39 @@ export default function StaffAuditsManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [dbPage, setDbPage] = useState(1); 
-  const [uiPage, setUiPage] = useState(1); 
-  const [limit, setLimit] = useState(5);   
-  
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [sortBy, setSortBy] = useState('performed_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(5);
 
   const [serverTotalItems, setServerTotalItems] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   useEffect(() => {
     const fetchAudits = async () => {
       try {
         setIsLoading(true);
         setError(null);
+        
         const response = await api.get('/api/audit-logs', {
           params: {
-            page: dbPage,
-            limit: 100 
+            page: page,
+            limit: limit,
+            search: debouncedSearch,
+            sortBy: sortBy,
+            sortOrder: sortOrder
           }
         });
-
+        
         const fetchedData = response.data?.data?.data || [];
         const meta = response.data?.data?.meta;
 
@@ -75,22 +83,23 @@ export default function StaffAuditsManagement() {
           setServerTotalItems(meta.total || 0);
           setServerTotalPages(meta.totalPages || 1);
         }
-
+        
       } catch (err: any) {
         setError(err?.response?.data?.error || 'Failed to load audit logs.');
         setAudits([]);
+        setServerTotalItems(0);
+        setServerTotalPages(1);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchAudits();
-  }, [dbPage]); 
-
+  }, [page, limit, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
-    setUiPage(1);
-  }, [search, limit, dbPage]);
+    setPage(1);
+  }, [debouncedSearch, limit, sortBy, sortOrder]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -115,51 +124,6 @@ export default function StaffAuditsManagement() {
       setSortOrder('asc');
     }
   };
-
-  const getProcessedAudits = () => {
-    let result = Array.isArray(audits) ? [...audits] : [];
-
-    if (search.trim() !== '') {
-      const term = search.toLowerCase();
-      result = result.filter(
-        (a) =>
-          a.user?.name?.toLowerCase().includes(term) ||
-          a.action_performed.toLowerCase().includes(term) ||
-          a.table_name.toLowerCase().includes(term) ||
-          String(a.log_id).includes(term)
-      );
-    }
-
-    result.sort((a, b) => {
-      let aVal = '';
-      let bVal = '';
-
-      if (sortBy === 'performed_at') {
-        aVal = a.performed_at;
-        bVal = b.performed_at;
-      } else if (sortBy === 'user') {
-        aVal = a.user?.name?.toLowerCase() ?? '';
-        bVal = b.user?.name?.toLowerCase() ?? '';
-      } else if (sortBy === 'action_performed') {
-        aVal = a.action_performed.toLowerCase();
-        bVal = b.action_performed.toLowerCase();
-      } else {
-        aVal = String(a.log_id);
-        bVal = String(b.log_id);
-      }
-
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  };
-
-  const processed = getProcessedAudits();
-  const totalUiItems = processed.length;
-  const totalUiPages = Math.ceil(totalUiItems / limit) || 1;
-  const pagedItems = processed.slice((uiPage - 1) * limit, uiPage * limit);
 
   if (authLoading) {
     return (
@@ -212,47 +176,13 @@ export default function StaffAuditsManagement() {
         </header>
 
         <main className="p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
-          
-          {/* TIER 1 PAGINATION: Database Fetch Controls */}
-          <div className="bg-brand-teal/5 border border-brand-teal/20 px-6 py-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white rounded-lg shadow-sm border border-brand-teal/10">
-                <Database className="size-5 text-brand-teal" />
-              </div>
-              <div>
-                <span className="text-sm font-bold text-neutral-800 block">
-                  Database Batch: {dbPage} of {serverTotalPages}
-                </span>
-                <span className="text-xs text-neutral-500 font-medium">
-                  Loading records {(dbPage - 1) * 100 + 1} to {Math.min(dbPage * 100, serverTotalItems)} out of {serverTotalItems} total
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setDbPage(p => p - 1)}
-                disabled={dbPage === 1 || isLoading}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="size-4" /> Load Previous 100
-              </button>
-              <button
-                onClick={() => setDbPage(p => p + 1)}
-                disabled={dbPage === serverTotalPages || isLoading}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg border border-neutral-200 bg-white hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Load Next 100 <ChevronRight className="size-4" />
-              </button>
-            </div>
-          </div>
-
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
             <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
               <div className="relative w-full max-w-xs shrink-0">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
                 <input
                   type="text"
-                  placeholder="Search current batch..."
+                  placeholder="Search full database..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 text-sm font-medium rounded-xl border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all placeholder:text-neutral-400"
@@ -303,14 +233,14 @@ export default function StaffAuditsManagement() {
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-neutral-400">Loading batch...</td>
+                      <td colSpan={5} className="text-center py-12 text-neutral-400">Loading database records...</td>
                     </tr>
-                  ) : pagedItems.length === 0 ? (
+                  ) : audits.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-neutral-400">No audit records found in this batch.</td>
+                      <td colSpan={5} className="text-center py-12 text-neutral-400">No audit records found matching your search.</td>
                     </tr>
                   ) : (
-                    pagedItems.map((audit) => (
+                    audits.map((audit) => (
                       <tr
                         key={audit.log_id}
                         onClick={() => setSelectedAudit(audit)}
@@ -328,23 +258,22 @@ export default function StaffAuditsManagement() {
               </table>
             </div>
 
-            {/* TIER 2 PAGINATION: Table UI Controls */}
-            {!isLoading && totalUiPages > 1 && (
+            {!isLoading && serverTotalPages > 1 && (
               <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
                 <span>
-                  Showing Page {uiPage} of {totalUiPages} (Items {(uiPage - 1) * limit + 1} to {Math.min(uiPage * limit, totalUiItems)})
+                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, serverTotalItems)} of {serverTotalItems} total entries
                 </span>
                 <div className="flex gap-2">
                   <button
-                    disabled={uiPage === 1}
-                    onClick={() => setUiPage(uiPage - 1)}
+                    disabled={page === 1}
+                    onClick={() => setPage(page - 1)}
                     className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft className="size-4" />
                   </button>
                   <button
-                    disabled={uiPage === totalUiPages}
-                    onClick={() => setUiPage(uiPage + 1)}
+                    disabled={page === serverTotalPages}
+                    onClick={() => setPage(page + 1)}
                     className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight className="size-4" />
