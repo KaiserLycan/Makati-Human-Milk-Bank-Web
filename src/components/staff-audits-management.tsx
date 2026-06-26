@@ -274,7 +274,7 @@ export default function StaffAuditsManagement() {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
                 <input
                   type="text"
-                  placeholder="Search full database..."
+                  placeholder="Search by User"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 text-sm font-medium rounded-xl border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all placeholder:text-neutral-400"
@@ -350,7 +350,7 @@ export default function StaffAuditsManagement() {
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('log_id')}>
-                      Log ID {sortBy === 'log_id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      ID {sortBy === 'log_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('performed_at')}>
                       Timestamp {sortBy === 'performed_at' && (sortOrder === 'asc' ? '↑' : '↓')}
