@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import StaffSidebar from './ui/staff-sidebar';
+import StaffNotificationBell from './ui/staff-notification-bell';
 import { api } from '../utils/api';
 
 const CustomDropdown = ({ 
@@ -514,15 +515,7 @@ export default function StaffCollectionManagement() {
             <div className="text-neutral-500 text-xs sm:text-sm font-medium">
               {currentTime || 'Loading date...'}
             </div>
-            <Link
-              href="/work/notification"
-              className="relative p-2 text-neutral-500 hover:text-brand-teal hover:bg-neutral-100 rounded-full transition-all duration-200"
-              data-testid="header-notification-btn"
-              aria-label="View notifications"
-            >
-              <Bell className="size-5" />
-              <span className="absolute top-1 right-1 size-2 bg-brand-teal rounded-full" />
-            </Link>
+            <StaffNotificationBell />
           </div>
         </header>
 
@@ -862,8 +855,8 @@ export default function StaffCollectionManagement() {
       {/* COLLECTION DETAILS MODAL */}
       {selectedCollection && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-all duration-300" data-testid="detail-modal">
-          <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col relative">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50 rounded-t-3xl">
               <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
                 <ClipboardList className="size-6 text-brand-teal" />
                 Collection Details
@@ -877,153 +870,161 @@ export default function StaffCollectionManagement() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-2 gap-5 items-center">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Milk Status</label>
-                  <div className="relative inline-block w-[140px]">
-                    {selectedCollection.pid ? (
-                      <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getMilkStatusBadge(selectedCollection.milk_status)}`}>
-                        {selectedCollection.milk_status}
-                      </span>
-                    ) : (
-                      <CustomDropdown
-                        disabled={isUpdatingStatus}
-                        triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getMilkStatusBadge(selectedCollection.milk_status)}`}
-                        dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
-                        optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
-                        value={selectedCollection.milk_status}
-                        onChange={(val: string) => handleUpdateMilkStatus(selectedCollection.ctn, val)}
-                        options={[
-                          { value: 'good', label: 'Good' },
-                          { value: 'contaminated', label: 'Contaminated' },
-                          { value: 'discarded', label: 'Discarded' },
-                          { value: 'expired', label: 'Expired' }
-                        ]}
-                      />
-                    )}
-                  </div>
-                </div>
+            <div className="p-6 space-y-6">
 
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">QAT Status</label>
-                  <div className="relative inline-block w-[140px]">
-                    {selectedCollection.pid ? (
-                      <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getQATStatusBadge(selectedCollection.qat_status)}`}>
-                        {selectedCollection.qat_status}
-                      </span>
-                    ) : (
-                      <CustomDropdown
-                        disabled={isUpdatingStatus}
-                        triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getQATStatusBadge(selectedCollection.qat_status)}`}
-                        dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
-                        optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
-                        value={selectedCollection.qat_status}
-                        onChange={(val: string) => handleUpdateQATStatus(selectedCollection.ctn, val)}
-                        options={[
-                          { value: 'pending', label: 'Pending' },
-                          { value: 'pass', label: 'Pass' },
-                          { value: 'fail', label: 'Fail' }
-                        ]}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {selectedCollection.pid && (
+              {/* Contextual Pooled To Alert - matching completely processed design */}
+              {selectedCollection.pid && (
+                <div className="p-4 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-2xl flex items-start gap-3" data-testid="collection-pooled-alert">
+                  <Info className="size-5 shrink-0" />
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Pooled To</label>
-                    <span className="px-2.5 py-1 text-[10px] font-bold border rounded-full bg-blue-50 text-blue-700 border-blue-100 uppercase tracking-wider">
-                      {selectedCollection.pid}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <hr className="border-neutral-100" />
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Donor Name</label>
-                  <div className="text-sm font-bold text-neutral-800 break-words" data-testid="modal-donor-name">
-                    {selectedCollection.donor?.name || `DTN: ${selectedCollection.donor?.dtn}`}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Collection ID</label>
-                  <div className="text-sm font-bold text-neutral-800" data-testid="modal-collection-id">{selectedCollection.ctn}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Program</label>
-                  <div className="text-sm font-bold text-neutral-800">{selectedCollection.program}</div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Volume</label>
-                  <div className="text-sm font-bold text-neutral-800" data-testid="modal-expected">{selectedCollection.volume_ml} mL</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Date Collected</label>
-                  <div className="text-sm font-bold text-neutral-800" data-testid="modal-date">
-                    {selectedCollection.collection_date ? new Date(selectedCollection.collection_date).toLocaleDateString() : 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Collected By</label>
-                  <div className="text-sm font-bold text-neutral-800 truncate" title={selectedCollection.collected_by_user?.name}>
-                    {selectedCollection.collected_by_user?.name || 'Unknown'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Expiration Date</label>
-                  <div className="text-sm font-bold text-neutral-800">
-                    {selectedCollection.expiration_date ? new Date(selectedCollection.expiration_date).toLocaleDateString() : 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Pickup Date</label>
-                  <div className="text-sm font-bold text-neutral-800">
-                    {selectedCollection.pickup_date ? new Date(selectedCollection.pickup_date).toLocaleDateString() : 'N/A'}
-                  </div>
-                </div>
-              </div>
-
-              {(selectedCollection.program === 'MW' || selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
-                <div className="grid grid-cols-2 gap-5">
-                  {selectedCollection.program === 'MW' && (
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Hospital</label>
-                      <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.hospital || 'N/A'}</div>
-                    </div>
-                  )}
-                  {(selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Health Center</label>
-                      <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.health_center || 'N/A'}</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedCollection.remarks && (
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Remarks</label>
-                  <div className="text-sm font-bold text-neutral-800 break-words">
-                    {selectedCollection.remarks}
+                    <p className="font-bold">Pooled</p>
+                    <p className="mt-0.5 opacity-90">This collection is pooled and assigned to PID {selectedCollection.pid}.</p>
                   </div>
                 </div>
               )}
+
+              {/* Two Column Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column: Details */}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">ID</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-collection-id">{selectedCollection.ctn}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Donor Name</label>
+                      <div className="text-sm font-bold text-neutral-800 break-words" data-testid="modal-donor-name">
+                        {selectedCollection.donor?.name || `DTN: ${selectedCollection.donor?.dtn}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Program</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedCollection.program}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Volume</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-expected">{selectedCollection.volume_ml} mL</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Date Collected</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-date">
+                        {selectedCollection.collection_date ? new Date(selectedCollection.collection_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Collected By</label>
+                      <div className="text-sm font-bold text-neutral-800 truncate" title={selectedCollection.collected_by_user?.name}>
+                        {selectedCollection.collected_by_user?.name || 'Unknown'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Expiration Date</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedCollection.expiration_date ? new Date(selectedCollection.expiration_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Pickup Date</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedCollection.pickup_date ? new Date(selectedCollection.pickup_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {(selectedCollection.program === 'MW' || selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
+                    <div className="grid grid-cols-2 gap-5">
+                      {selectedCollection.program === 'MW' && (
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Hospital</label>
+                          <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.hospital || 'N/A'}</div>
+                        </div>
+                      )}
+                      {(selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Health Center</label>
+                          <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.health_center || 'N/A'}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedCollection.remarks && (
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Remarks</label>
+                      <div className="text-sm font-bold text-neutral-800 break-words">
+                        {selectedCollection.remarks}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Status / QC Dropdowns */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Milk Status</label>
+                    <div className="relative w-full">
+                      {selectedCollection.pid ? (
+                        <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getMilkStatusBadge(selectedCollection.milk_status)}`}>
+                          {selectedCollection.milk_status}
+                        </span>
+                      ) : (
+                        <CustomDropdown
+                          disabled={isUpdatingStatus}
+                          triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getMilkStatusBadge(selectedCollection.milk_status)}`}
+                          dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
+                          optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
+                          value={selectedCollection.milk_status}
+                          onChange={(val: string) => handleUpdateMilkStatus(selectedCollection.ctn, val)}
+                          options={[
+                            { value: 'good', label: 'Good' },
+                            { value: 'contaminated', label: 'Contaminated' },
+                            { value: 'discarded', label: 'Discarded' },
+                            { value: 'expired', label: 'Expired' }
+                          ]}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">QAT Status</label>
+                    <div className="relative w-full">
+                      {selectedCollection.pid ? (
+                        <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getQATStatusBadge(selectedCollection.qat_status)}`}>
+                          {selectedCollection.qat_status}
+                        </span>
+                      ) : (
+                        <CustomDropdown
+                          disabled={isUpdatingStatus}
+                          triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getQATStatusBadge(selectedCollection.qat_status)}`}
+                          dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
+                          optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
+                          value={selectedCollection.qat_status}
+                          onChange={(val: string) => handleUpdateQATStatus(selectedCollection.ctn, val)}
+                          options={[
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'pass', label: 'Pass' },
+                            { value: 'fail', label: 'Fail' }
+                          ]}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50">
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50 rounded-b-3xl">
               <button
                 onClick={handleDeleteCollection}
                 className="px-6 py-3 text-red-600 hover:bg-red-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"

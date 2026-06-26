@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import StaffSidebar from './ui/staff-sidebar';
+import StaffNotificationBell from './ui/staff-notification-bell';
 import { api } from '../utils/api';
 
 const CustomDropdown = ({ 
@@ -337,15 +338,7 @@ export default function StaffPoolManagement() {
             <div className="text-neutral-500 text-xs sm:text-sm font-medium">
               {currentTime || 'Loading date...'}
             </div>
-            <Link
-              href="/work/notification"
-              className="relative p-2 text-neutral-500 hover:text-brand-teal hover:bg-neutral-100 rounded-full transition-all duration-200"
-              data-testid="header-notification-btn"
-              aria-label="View notifications"
-            >
-              <Bell className="size-5" />
-              <span className="absolute top-1 right-1 size-2 bg-brand-teal rounded-full" />
-            </Link>
+            <StaffNotificationBell />
           </div>
         </header>
 
@@ -406,7 +399,7 @@ export default function StaffPoolManagement() {
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('id')} data-testid="th-id">
-                      PID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      ID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('datePooled')} data-testid="th-date">
                       Date Pooled {sortBy === 'datePooled' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -550,7 +543,7 @@ export default function StaffPoolManagement() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">PID</label>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">ID</label>
                       <div className="text-sm font-bold text-neutral-800" data-testid="modal-batch-id">{selectedPool.pid}</div>
                     </div>
                     <div>
