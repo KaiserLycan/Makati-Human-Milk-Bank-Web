@@ -335,8 +335,8 @@ export default function StaffInventoryManagement() {
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('btl_id')}>
                       ID {sortBy === 'btl_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('batch_id')}>
-                      Batch ID {sortBy === 'batch_id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('batch_number')}>
+                      Batch ID {sortBy === 'batch_number' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('volume_ml')}>
                       Volume {sortBy === 'volume_ml' && (sortOrder === 'asc' ? '↑' : '↓')}
