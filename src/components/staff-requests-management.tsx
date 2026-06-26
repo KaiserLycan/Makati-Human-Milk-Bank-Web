@@ -16,9 +16,10 @@ import {
   Info,
   CheckCircle2, 
   XCircle,      
-  Edit2,     // Added for Edit action
-  Trash2,    // Added for Delete action
-  Milk       // Added for Traceability icon
+  Edit2,     
+  Trash2,    
+  Milk,
+  AlertTriangle
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import { api } from '../utils/api';
@@ -90,8 +91,8 @@ export interface MilkRequest {
   request_status: string;
   beneficiary?: {
     name: string;
+    caregiver: string;
   };
-  // NEW: Added request_bottles for traceability
   request_bottles?: {
     pasteurized_milk: {
       btl_id: number;
@@ -118,10 +119,15 @@ export default function StaffRequestsManagement() {
 
   // Modal Visibility & Form State
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false); // NEW: Edit Modal State
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   
+  // Confirmation Modal State
+  const [confirmAction, setConfirmAction] = useState<'dispense' | 'cancel' | 'delete' | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const [newRequestForm, setNewRequestForm] = useState({
     beneficiary_id: '',
     hospital: '',
@@ -248,11 +254,11 @@ export default function StaffRequestsManagement() {
 
       const requestedVolume = parseFloat(newRequestForm.volume_ml);
 
-      if (requestedVolume < 20) {
-        throw new Error("Requested volume is too low. Minimum request is 20 mL.");
+      if (requestedVolume < 10) {
+        throw new Error("Requested volume is too low. Minimum request is 10 mL.");
       }
-      if (requestedVolume > 800) {
-        throw new Error("Requested volume exceeds the maximum limit (800 mL). Please submit separate requests if more is needed.");
+      if (requestedVolume > 999) {
+        throw new Error("Requested volume exceeds the maximum limit (999 mL). Please submit separate requests if more is needed.");
       }
 
       const payload = {
@@ -270,14 +276,12 @@ export default function StaffRequestsManagement() {
       setBeneficiarySearchQuery('');
       fetchRequests();
     } catch (err: any) {
-      // Backend now sends the exact duplicate constraint error, so we display it directly!
       setFormError(err.response?.data?.message || err.message || 'Failed to create request.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // NEW Action: Edit
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -307,46 +311,39 @@ export default function StaffRequestsManagement() {
     }
   };
 
-  // Action: Cancel
-  const handleCancelRequest = async (rid: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation(); 
-    if (!confirm(`Are you sure you want to cancel Request #${rid}?`)) return;
-    
+  // --- ACTION CONFIRMATION EXECUTION ---
+  const executeConfirmAction = async () => {
+    if (!selectedRequest || !confirmAction) return;
+    setActionLoading(true);
+    setActionError(null);
+
     try {
-      await api.patch(`/api/reservations/${rid}/cancel`);
+      if (confirmAction === 'dispense') {
+        await api.patch(`/api/dispensing/${selectedRequest.rid}/dispense`);
+      } else if (confirmAction === 'cancel') {
+        await api.patch(`/api/reservations/${selectedRequest.rid}/cancel`);
+      } else if (confirmAction === 'delete') {
+        await api.delete(`/api/reservations/${selectedRequest.rid}`);
+      }
+      
       fetchRequests();
-      setSelectedRequest(null);
+      setConfirmAction(null);
+      setSelectedRequest(null); // Close the detail modal after success
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to cancel request');
+      setActionError(error.response?.data?.message || `Failed to process request.`);
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  // NEW Action: Delete (Admin Purge)
-  const handleDeleteRequest = async (rid: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation(); 
-    if (!confirm(`WARNING: Are you sure you want to PERMANENTLY delete Request #${rid}? This cannot be undone.`)) return;
-    
-    try {
-      await api.delete(`/api/reservations/${rid}`);
-      fetchRequests();
-      if (selectedRequest?.rid === rid) setSelectedRequest(null);
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete request');
-    }
-  };
-
-  // Action: Dispense (Complete)
-  const handleDispenseRequest = async (rid: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation(); 
-    if (!confirm(`Are you ready to dispense milk and fulfill Request #${rid}?`)) return;
-
-    try {
-      await api.patch(`/api/dispensing/${rid}/dispense`);
-      fetchRequests();
-      setSelectedRequest(null);
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to dispense request');
-    }
+  const openEditFormFromModal = () => {
+    if (!selectedRequest) return;
+    setEditRequestForm({
+      rid: selectedRequest.rid,
+      hospital: selectedRequest.hospital || '',
+      volume_ml: selectedRequest.requested_vol_ml.toString()
+    });
+    setIsEditOpen(true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -464,7 +461,6 @@ export default function StaffRequestsManagement() {
                       Date {sortBy === 'requested_date' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 text-center">Status</th>
-                    <th className="px-6 py-4 text-center">Actions</th> 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
@@ -477,7 +473,6 @@ export default function StaffRequestsManagement() {
                         <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-16"></div></td>
                         <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
                         <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded-full w-16 mx-auto"></div></td>
-                        <td className="px-6 py-4.5 text-center"><div className="h-6 bg-slate-200 rounded w-16 mx-auto"></div></td>
                       </tr>
                     ))
                   ) : requests.map((item) => (
@@ -492,70 +487,16 @@ export default function StaffRequestsManagement() {
                       <td className="px-6 py-4.5 font-bold text-neutral-900 text-left">{item.requested_vol_ml} mL</td>
                       <td className="px-6 py-4.5 text-neutral-500">{item.requested_date ? new Date(item.requested_date).toLocaleDateString() : 'N/A'}</td>
                       <td className="px-6 py-4.5 text-center">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize ${getStatusBadge(item.request_status)}`}>
+                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize uppercase tracking-wider ${getStatusBadge(item.request_status)}`}>
                           {item.request_status || 'Waiting'}
                         </span>
-                      </td>
-                      
-                      {/* QUICK ACTIONS CELL */}
-                      <td className="px-6 py-4.5 text-center">
-                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          
-                          {/* Edit Action - Only for Waiting requests */}
-                          {item.request_status?.toLowerCase() === 'waiting' && (
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditRequestForm({
-                                  rid: item.rid,
-                                  hospital: item.hospital || '',
-                                  volume_ml: item.requested_vol_ml.toString()
-                                });
-                                setIsEditOpen(true);
-                              }}
-                              className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                              title="Edit Request"
-                            >
-                              <Edit2 className="size-4" />
-                            </button>
-                          )}
-
-                          {['waiting', 'allocated'].includes(item.request_status?.toLowerCase()) ? (
-                            <>
-                              <button 
-                                onClick={(e) => handleDispenseRequest(item.rid, e)}
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                                title="Dispense Milk"
-                              >
-                                <CheckCircle2 className="size-4" />
-                              </button>
-                              <button 
-                                onClick={(e) => handleCancelRequest(item.rid, e)}
-                                className="p-1.5 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors"
-                                title="Cancel Request"
-                              >
-                                <XCircle className="size-4" />
-                              </button>
-                            </>
-                          ) : null}
-
-                          {/* Delete Action - Available for all to clear ghosts/tests */}
-                          <button 
-                            onClick={(e) => handleDeleteRequest(item.rid, e)}
-                            className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors"
-                            title="Permanently Delete Request"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
-
-                        </div>
                       </td>
                     </tr>
                   ))}
 
                   {!isLoading && requests.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-12 text-neutral-400">
+                      <td colSpan={6} className="text-center py-12 text-neutral-400">
                         No requests found matching current criteria.
                       </td>
                     </tr>
@@ -662,8 +603,8 @@ export default function StaffRequestsManagement() {
                 <input
                   type="number"
                   required
-                  min={20}
-                  max={800}
+                  min={10}
+                  max={999}
                   value={newRequestForm.volume_ml}
                   onChange={(e) => setNewRequestForm({ ...newRequestForm, volume_ml: e.target.value })}
                   className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm font-bold"
@@ -694,7 +635,7 @@ export default function StaffRequestsManagement() {
 
       {/* EDIT REQUEST MODAL */}
       {isEditOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
           <form
             onSubmit={handleEditSubmit}
             className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden"
@@ -747,8 +688,8 @@ export default function StaffRequestsManagement() {
                 <input
                   type="number"
                   required
-                  min={20}
-                  max={800}
+                  min={10}
+                  max={999}
                   value={editRequestForm.volume_ml}
                   onChange={(e) => setEditRequestForm({ ...editRequestForm, volume_ml: e.target.value })}
                   className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm font-bold"
@@ -776,125 +717,235 @@ export default function StaffRequestsManagement() {
         </div>
       )}
 
-      {/* REQUEST DETAILS MODAL (WITH TRACEABILITY) */}
+      {/* REQUEST DETAILS MODAL (POOL MANAGEMENT STYLE) */}
       {selectedRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden max-h-[90vh]">
-            <div className="bg-white border-b border-neutral-200 px-6 py-4.5 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <FileText className="size-5 text-brand-teal" />
-                <h3 className="text-lg font-bold text-neutral-900">Request Details</h3>
-              </div>
+          <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50">
+              <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
+                <FileText className="size-6 text-brand-teal" />
+                Request Details
+              </h3>
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all"
+                className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-full transition-colors"
               >
                 <X className="size-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6 overflow-y-auto">
-              <div className="flex items-center gap-4">
-                <div className="size-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-brand-teal">
-                  <FileText className="size-8" />
+            <div className="p-6 overflow-y-auto space-y-6">
+              
+              {/* Contextual Status Alert */}
+              {selectedRequest.request_status === 'allocated' && (
+                <div className="p-4 bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold rounded-2xl flex items-start gap-3">
+                  <Info className="size-5 shrink-0" />
+                  <div>
+                    <p className="font-bold">Bottles Allocated</p>
+                    <p className="mt-0.5 opacity-90">Milk bottles have been reserved for this request. It is ready to be dispensed.</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-bold text-neutral-950 text-base">
-                    {selectedRequest.beneficiary?.name || `BID: ${selectedRequest.bid}`}
-                  </h4>
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                    Request ID: <span className="text-neutral-900">{selectedRequest.rid}</span>
-                  </p>
-                </div>
-              </div>
+              )}
 
-              <hr className="border-neutral-100" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column: Details */}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Request ID</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedRequest.rid}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Date Requested</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedRequest.requested_date ? new Date(selectedRequest.requested_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="space-y-3.5 text-xs">
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold flex items-center gap-1.5">
-                    <Hospital className="size-4 text-neutral-400" /> Hospital / Facility:
-                  </span>
-                  <span className="font-bold text-neutral-800">{selectedRequest.hospital || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Requested Volume:</span>
-                  <span className="font-bold text-neutral-800">{selectedRequest.requested_vol_ml} mL</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Date Requested:</span>
-                  <span className="font-bold text-neutral-800">
-                    {selectedRequest.requested_date ? new Date(selectedRequest.requested_date).toLocaleDateString() : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-neutral-400 font-semibold">Status:</span>
-                  <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full capitalize ${getStatusBadge(selectedRequest.request_status)}`}>
-                    {selectedRequest.request_status || 'Waiting'}
-                  </span>
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Beneficiary</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedRequest.beneficiary?.name || `BID: ${selectedRequest.bid}`}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Hospital / Facility</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedRequest.hospital || 'N/A'}</div>
+                    </div>
+                  </div>
 
-              {/* NEW: Traceability Section */}
-              {selectedRequest.request_bottles && selectedRequest.request_bottles.length > 0 && (
-                <>
-                  <hr className="border-neutral-100" />
-                  <div className="space-y-3 text-xs">
-                    <h5 className="font-bold text-neutral-900 flex items-center gap-2">
-                      <Milk className="size-4 text-brand-teal" /> Allocated Bottles
-                    </h5>
-                    <div className="bg-neutral-50 rounded-xl border border-neutral-200 overflow-hidden">
-                      <table className="w-full text-left">
-                        <thead className="bg-neutral-100 border-b border-neutral-200 text-[10px] text-neutral-500 uppercase tracking-wider">
-                          <tr>
-                            <th className="px-4 py-2.5 font-bold">Bottle ID</th>
-                            <th className="px-4 py-2.5 font-bold text-right">Volume</th>
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Requested Volume</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedRequest.requested_vol_ml} mL</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Request Status</label>
+                      <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getStatusBadge(selectedRequest.request_status)}`}>
+                        {selectedRequest.request_status || 'Waiting'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Traceability */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Allocated Bottles</label>
+                    <div className="bg-slate-50 border border-neutral-100 rounded-2xl overflow-hidden shadow-inner max-h-[250px] overflow-y-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-neutral-100/50 text-[10px] font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-150 sticky top-0 z-10 select-none">
+                            <th className="px-4 py-2.5">Bottle ID</th>
+                            <th className="px-4 py-2.5 text-right">Volume</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-neutral-100 font-bold text-neutral-700">
-                          {selectedRequest.request_bottles.map((bottle, idx) => (
-                            <tr key={idx} className="hover:bg-neutral-100/50 transition-colors">
-                              <td className="px-4 py-3">BTL-{bottle.pasteurized_milk.btl_id}</td>
-                              <td className="px-4 py-3 text-right">{bottle.pasteurized_milk.volume_ml} mL</td>
+                        <tbody className="divide-y divide-neutral-100 font-semibold text-neutral-700">
+                          {selectedRequest.request_bottles && selectedRequest.request_bottles.length > 0 ? (
+                            selectedRequest.request_bottles.map((bottle, idx) => (
+                              <tr key={idx} className="hover:bg-slate-100/50 transition-colors">
+                                <td className="px-4 py-3.5 font-bold text-neutral-900">BTL-{bottle.pasteurized_milk.btl_id}</td>
+                                <td className="px-4 py-3.5 text-right text-neutral-800">{bottle.pasteurized_milk.volume_ml} mL</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={2} className="px-4 py-8 text-center text-neutral-400 font-medium">
+                                No bottles allocated yet.
+                              </td>
                             </tr>
-                          ))}
+                          )}
                         </tbody>
                       </table>
                     </div>
                   </div>
-                </>
-              )}
+                </div>
+              </div>
             </div>
 
-            <div className="px-6 py-4.5 bg-neutral-50 border-t border-neutral-150 flex items-center justify-end gap-3.5 shrink-0">
-              {['waiting', 'allocated'].includes(selectedRequest.request_status?.toLowerCase()) ? (
-                <>
-                  <button
-                    onClick={(e) => handleCancelRequest(selectedRequest.rid, e as any)}
-                    className="px-5 py-2.5 text-xs font-bold text-amber-600 hover:text-white hover:bg-amber-500 border border-amber-200 rounded-xl transition-all cursor-pointer"
-                  >
-                    Cancel Request
-                  </button>
-                  <button
-                    onClick={(e) => handleDispenseRequest(selectedRequest.rid, e as any)}
-                    className="px-5 py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all shadow-[0_2px_8px_rgba(0,105,111,0.15)] cursor-pointer flex items-center gap-1.5"
-                  >
-                    <CheckCircle2 className="size-4" />
-                    Dispense & Fulfill
-                  </button>
-                </>
-              ) : (
+            {/* Modal Footer (Mirrored from Pool Management) */}
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50 shrink-0">
+              <button
+                onClick={() => setConfirmAction('delete')}
+                className="px-6 py-3 text-red-600 hover:bg-red-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+              >
+                <Trash2 className="size-4" /> Delete
+              </button>
+              
+              {selectedRequest.request_status === 'waiting' && (
                 <button
-                  onClick={() => setSelectedRequest(null)}
-                  className="px-5 py-2.5 text-xs font-bold text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-xl transition-all"
+                  onClick={openEditFormFromModal}
+                  className="px-6 py-3 text-brand-teal hover:bg-brand-teal/10 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
                 >
-                  Close
+                  <Edit2 className="size-4" /> Edit
                 </button>
               )}
+
+              {['waiting', 'allocated'].includes(selectedRequest.request_status?.toLowerCase()) && (
+                <button
+                  onClick={() => setConfirmAction('cancel')}
+                  className="px-6 py-3 text-amber-600 hover:bg-amber-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                >
+                  <XCircle className="size-4" /> Cancel
+                </button>
+              )}
+
+              {['waiting', 'allocated'].includes(selectedRequest.request_status?.toLowerCase()) && (
+                <button
+                  onClick={() => setConfirmAction('dispense')}
+                  className="px-6 py-3 text-white bg-brand-teal hover:bg-brand-teal/90 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-brand-teal/20"
+                >
+                  <CheckCircle2 className="size-4" /> Dispense
+                </button>
+              )}
+
+              <button
+                onClick={() => setSelectedRequest(null)}
+                className="px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-xl transition-colors ml-2 shadow-lg shadow-neutral-900/20"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* CONFIRMATION ACTION MODAL (Mirrors the Logout UI) */}
+      {confirmAction && selectedRequest && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-sm relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {confirmAction === 'delete' ? (
+                  <Trash2 className="size-5 text-red-500" />
+                ) : confirmAction === 'cancel' ? (
+                  <AlertTriangle className="size-5 text-amber-500" />
+                ) : (
+                  <CheckCircle2 className="size-5 text-brand-teal" />
+                )}
+                <h3 className="text-base font-bold text-neutral-900 capitalize">
+                  Confirm {confirmAction}
+                </h3>
+              </div>
+              <button
+                onClick={() => setConfirmAction(null)}
+                disabled={actionLoading}
+                className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all disabled:opacity-50"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-neutral-600 leading-relaxed">
+                {confirmAction === 'delete' 
+                  ? `Are you sure you want to permanently delete Request #${selectedRequest.rid}? This action cannot be undone and will erase it from the database.`
+                  : confirmAction === 'cancel'
+                  ? `Are you sure you want to cancel Request #${selectedRequest.rid}? Any allocated milk will be returned to inventory.`
+                  : `Are you sure you want to dispense milk for Request #${selectedRequest.rid}? This marks the request as fulfilled.`}
+              </p>
+
+              {actionError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium animate-in fade-in duration-200">
+                  {actionError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  disabled={actionLoading}
+                  className="flex-1 h-11 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={executeConfirmAction}
+                  disabled={actionLoading}
+                  className={`flex-1 h-11 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    confirmAction === 'delete' ? 'bg-red-500 hover:bg-red-600' :
+                    confirmAction === 'cancel' ? 'bg-amber-500 hover:bg-amber-600' :
+                    'bg-brand-teal hover:bg-brand-teal-darker'
+                  }`}
+                >
+                  {actionLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    <span className="capitalize">{confirmAction}</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
