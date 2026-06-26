@@ -1,9 +1,9 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import StaffRequestsManagement from '../staff-requests-management';
-import * as storage from '../../utils/storage';
+import { api } from '../../utils/api';
 
-// Mock next/link to prevent issues in Jest environment
+// Mock next/link
 jest.mock('next/link', () => {
   const MockLink = ({ children, href, ...rest }: { children: React.ReactNode; href: string; [key: string]: any }) => {
     return <a href={href} {...rest}>{children}</a>;
@@ -12,135 +12,192 @@ jest.mock('next/link', () => {
   return MockLink;
 });
 
-// Mock storage module functions
-jest.mock('../../utils/storage', () => {
-  const actual = jest.requireActual('../../utils/storage');
-  return {
-    ...actual,
-    loadRequests: jest.fn(),
-    saveRequests: jest.fn(),
-    loadAudits: jest.fn(),
-    saveAudits: jest.fn(),
-    loadProfile: jest.fn(),
-  };
-});
+// Mock api utility
+jest.mock('../../utils/api', () => ({
+  api: {
+    get: jest.fn(),
+    post: jest.fn(),
+    patch: jest.fn(),
+  }
+}));
 
 describe('StaffRequestsManagement Component', () => {
+  const mockRequestsResponse = {
+    data: {
+      data: {
+        data: [
+          {
+            rid: 61,
+            bid: 109,
+            hospital: 'Makati Med',
+            requested_vol_ml: 200,
+            requested_date: '2026-06-25T00:00:00.000Z',
+            request_status: 'waiting',
+            // FIX: Changed from Sofia to Baby John so it doesn't collide with the search test
+            beneficiary: { name: 'Baby John' } 
+          },
+          {
+            rid: 62,
+            bid: 67,
+            hospital: 'General Hospital',
+            requested_vol_ml: 150,
+            requested_date: '2026-06-26T00:00:00.000Z',
+            request_status: 'allocated',
+            beneficiary: { name: 'Baby Ava Torres' }
+          }
+        ],
+        meta: {
+          total: 2,
+          page: 1,
+          limit: 5,
+          totalPages: 1
+        }
+      }
+    }
+  };
+
+  const mockBeneficiariesResponse = {
+    data: {
+      data: {
+        data: [
+          { bid: 109, name: 'Sofia Ezekiel Luna', caregiver_email: 'caregiver@test.com' }
+        ]
+      }
+    }
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
-    (storage.loadProfile as jest.Mock).mockReturnValue({
-      name: 'Alice May Miller',
-      id: '2024102114',
-      email: 'staff@mhmb.gov',
-      role: 'manager',
+    
+    (api.get as jest.Mock).mockImplementation((url) => {
+      if (url === '/api/reservations') {
+        return Promise.resolve(mockRequestsResponse);
+      }
+      if (url === '/api/beneficiaries') {
+        return Promise.resolve(mockBeneficiariesResponse);
+      }
+      return Promise.resolve({ data: {} });
     });
+
+    window.confirm = jest.fn(() => true);
   });
 
-  const mockRequests: storage.MilkRequest[] = [
-    { id: 'REQ001', beneficiaryName: 'Leo Carter', hospital: 'Makati Medical Center', requestedVolume: 200, dateRequested: '2026-06-19', status: 'Pending' },
-    { id: 'REQ002', beneficiaryName: 'Noah Phillips', hospital: 'St. Jude Hospital', requestedVolume: 150, dateRequested: '2026-06-20', status: 'Fulfilled' },
-  ];
-
-  it('renders milk requests list and supports details viewing', () => {
-    (storage.loadRequests as jest.Mock).mockReturnValue(mockRequests);
+  it('renders the table and fetches requests with default params', async () => {
     render(<StaffRequestsManagement />);
 
     expect(screen.getByRole('heading', { name: 'Milk Requests' })).toBeInTheDocument();
-    expect(screen.getByText('REQ001')).toBeInTheDocument();
-    expect(screen.getByText('Leo Carter')).toBeInTheDocument();
-    expect(screen.getByText('200 mL')).toBeInTheDocument();
+    
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/api/reservations', {
+        params: expect.objectContaining({
+          page: 1,
+          limit: 5,
+          sortBy: 'rid',
+          sortOrder: 'desc'
+        })
+      });
 
-    // Click request ID to open modal
-    const rowIdBtn = screen.getByText('REQ001');
-    fireEvent.click(rowIdBtn);
-
-    expect(screen.getByTestId('detail-modal')).toBeInTheDocument();
-    expect(screen.getByTestId('modal-beneficiary-name')).toHaveTextContent('Leo Carter');
-    expect(screen.getByTestId('modal-hospital')).toHaveTextContent('Makati Medical Center');
-    expect(screen.getByTestId('modal-volume')).toHaveTextContent('200 mL');
+      expect(screen.getByText('Baby John')).toBeInTheDocument();
+      expect(screen.getByText('Baby Ava Torres')).toBeInTheDocument();
+    });
   });
 
-  it('supports filters for status and search queries', () => {
-    (storage.loadRequests as jest.Mock).mockReturnValue(mockRequests);
+  it('triggers a new fetch when the status filter is changed', async () => {
     render(<StaffRequestsManagement />);
 
-    // Search query filter
-    const searchInput = screen.getByTestId('search-input');
-    fireEvent.change(searchInput, { target: { value: 'St. Jude' } });
+    await waitFor(() => {
+      expect(screen.getByText('Baby John')).toBeInTheDocument();
+    });
 
-    expect(screen.getByText('Noah Phillips')).toBeInTheDocument();
-    expect(screen.queryByText('Leo Carter')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('All Statuses'));
+    fireEvent.click(screen.getByText('Waiting'));
 
-    // Clear search and filter status
-    fireEvent.change(searchInput, { target: { value: '' } });
-    const statusSelect = screen.getByTestId('status-select');
-    fireEvent.change(statusSelect, { target: { value: 'Pending' } });
-
-    expect(screen.getByText('Leo Carter')).toBeInTheDocument();
-    expect(screen.queryByText('Noah Phillips')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/api/reservations', {
+        params: expect.objectContaining({
+          request_status: 'waiting'
+        })
+      });
+    });
   });
 
-  it('opens registration modal, validates fields, and creates a pending request', () => {
-    (storage.loadRequests as jest.Mock).mockReturnValue(mockRequests);
-    (storage.loadProfile as jest.Mock).mockReturnValue({ name: 'Alice May Miller', id: '2024102114', email: 'staff@mhmb.gov', role: 'manager' });
-    (storage.loadAudits as jest.Mock).mockReturnValue([]);
-
+  it('creates a new request successfully including beneficiary search', async () => {
+    (api.post as jest.Mock).mockResolvedValue({ data: { success: true } });
+    
     render(<StaffRequestsManagement />);
 
-    const newRequestBtn = screen.getByTestId('new-request-btn');
-    fireEvent.click(newRequestBtn);
+    fireEvent.click(screen.getByText('New Request'));
 
-    expect(screen.getByTestId('new-request-modal')).toBeInTheDocument();
+    const searchInput = screen.getByPlaceholderText('Search beneficiary name...');
+    fireEvent.change(searchInput, { target: { value: 'Sofia' } });
 
-    // Input fields
-    const nameInput = screen.getByTestId('input-beneficiary-name');
-    const hospitalInput = screen.getByTestId('input-hospital');
-    const volumeInput = screen.getByTestId('input-volume');
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/api/beneficiaries', {
+        params: { search: 'Sofia', limit: 5 }
+      });
+    });
 
-    fireEvent.change(nameInput, { target: { value: 'Mason Jenkins' } });
-    fireEvent.change(hospitalInput, { target: { value: 'Taguig Gen Hospital' } });
-    fireEvent.change(volumeInput, { target: { value: '180' } });
+    // This will now pass because Sofia is ONLY in the dropdown, not the table!
+    fireEvent.mouseDown(screen.getByText('Sofia Ezekiel Luna'));
 
-    const confirmBtn = screen.getByTestId('confirm-register-btn');
-    fireEvent.click(confirmBtn);
+    fireEvent.change(screen.getByPlaceholderText('e.g. Makati Medical Center'), {
+      target: { value: 'Makati Med' }
+    });
+    
+    fireEvent.change(screen.getByPlaceholderText('e.g. 200'), {
+      target: { value: '250' }
+    });
 
-    // Verify it was saved to storage
-    expect(storage.saveRequests).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: 'REQ003',
-          beneficiaryName: 'Mason Jenkins',
-          hospital: 'Taguig Gen Hospital',
-          requestedVolume: 180,
-          status: 'Pending',
-        }),
-      ])
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Create Request' }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/api/reservations', {
+        beneficiary_id: 109,
+        bid: 109,
+        hospital: 'Makati Med',
+        volume_ml: 250,
+        requested_vol_ml: 250
+      });
+    });
   });
 
-  it('allows fulfilling and declining of pending requests in details modal', () => {
-    (storage.loadRequests as jest.Mock).mockReturnValue(mockRequests);
-    (storage.loadProfile as jest.Mock).mockReturnValue({ name: 'Alice May Miller', id: '2024102114', email: 'staff@mhmb.gov', role: 'manager' });
-    (storage.loadAudits as jest.Mock).mockReturnValue([]);
-
+  it('triggers a cancel request PATCH call when clicking the quick action', async () => {
+    (api.patch as jest.Mock).mockResolvedValue({ data: { success: true } });
+    
     render(<StaffRequestsManagement />);
 
-    // Open detail modal for REQ001
-    const rowIdBtn = screen.getByText('REQ001');
-    fireEvent.click(rowIdBtn);
+    await waitFor(() => {
+      expect(screen.getByText('61')).toBeInTheDocument();
+    });
 
-    // Click Fulfill
-    const fulfillBtn = screen.getByTestId('fulfill-btn');
-    fireEvent.click(fulfillBtn);
+    // FIX: Use getAllByTitle and select the first one [0]
+    const cancelBtns = screen.getAllByTitle('Cancel Request');
+    fireEvent.click(cancelBtns[0]);
 
-    // Verify request is saved as Fulfilled
-    expect(storage.saveRequests).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: 'REQ001',
-          status: 'Fulfilled',
-        }),
-      ])
-    );
+    expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to cancel Request #61?');
+
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith('/api/reservations/61/cancel');
+    });
+  });
+
+  it('triggers a dispense request PATCH call when clicking the quick action', async () => {
+    (api.patch as jest.Mock).mockResolvedValue({ data: { success: true } });
+    
+    render(<StaffRequestsManagement />);
+
+    await waitFor(() => {
+      expect(screen.getByText('61')).toBeInTheDocument();
+    });
+
+    // FIX: Use getAllByTitle and select the first one [0]
+    const dispenseBtns = screen.getAllByTitle('Dispense Milk');
+    fireEvent.click(dispenseBtns[0]);
+
+    expect(window.confirm).toHaveBeenCalledWith('Are you ready to dispense milk and fulfill Request #61?');
+
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith('/api/dispensing/61/dispense');
+    });
   });
 });
