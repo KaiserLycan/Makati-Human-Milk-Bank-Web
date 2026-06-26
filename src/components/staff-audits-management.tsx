@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Search,
@@ -10,11 +10,70 @@ import {
   ChevronRight,
   ShieldAlert,
   ArrowRight,
+  SlidersHorizontal,
+  ChevronDown
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../utils/api';
+
+// --- CUSTOM DROPDOWN COMPONENT ---
+const CustomDropdown = ({ 
+  value, 
+  onChange, 
+  options, 
+  icon: Icon, 
+  triggerClassName, 
+  dropdownClassName,
+  optionClassName,
+  disabled 
+}: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find((o: any) => o.value === value) || options[0];
+
+  return (
+    <div className="relative" ref={containerRef}>
+      {Icon && <Icon className="size-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10" />}
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`${triggerClassName} flex items-center justify-between gap-2 select-none ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span>{selectedOption?.label || value}</span>
+        <ChevronDown className={`size-3.5 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {isOpen && (
+        <div className={`absolute top-full mt-1.5 w-full bg-white border border-neutral-200 rounded-xl shadow-lg z-[60] overflow-hidden min-w-[140px] left-0 ${dropdownClassName || ''}`}>
+          {options.map((option: any) => (
+            <div
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`px-3.5 py-2.5 text-xs font-bold cursor-pointer transition-colors ${value === option.value ? 'bg-brand-teal/10 text-brand-teal' : 'text-neutral-600 hover:bg-slate-50'} ${optionClassName || ''}`}
+            >
+              {option.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface AuditLogEntry {
   log_id: number;
@@ -41,6 +100,7 @@ export default function StaffAuditsManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // --- Search & Pagination State ---
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [sortBy, setSortBy] = useState('performed_at');
@@ -48,8 +108,26 @@ export default function StaffAuditsManagement() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
+  // --- Dropdown Filter States ---
+  const [filterAction, setFilterAction] = useState('');
+  const [filterTable, setFilterTable] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+
   const [serverTotalItems, setServerTotalItems] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
+
+  // Generate the last 12 months for the dropdown dynamically
+  const getMonthOptions = () => {
+    const options = [{ value: '', label: 'All Time' }];
+    const today = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      options.push({ value, label });
+    }
+    return options;
+  };
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -64,13 +142,25 @@ export default function StaffAuditsManagement() {
         setIsLoading(true);
         setError(null);
         
+        let start_date = undefined;
+        let end_date = undefined;
+        if (filterMonth) {
+          const [year, month] = filterMonth.split('-');
+          start_date = new Date(Number(year), Number(month) - 1, 1).toISOString();
+          end_date = new Date(Number(year), Number(month), 0, 23, 59, 59, 999).toISOString();
+        }
+
         const response = await api.get('/api/audit-logs', {
           params: {
             page: page,
             limit: limit,
             search: debouncedSearch,
             sortBy: sortBy,
-            sortOrder: sortOrder
+            sortOrder: sortOrder,
+            action_performed: filterAction || undefined,
+            table_name: filterTable || undefined,
+            start_date: start_date,
+            end_date: end_date
           }
         });
         
@@ -95,11 +185,11 @@ export default function StaffAuditsManagement() {
     };
 
     fetchAudits();
-  }, [page, limit, debouncedSearch, sortBy, sortOrder]);
+  }, [page, limit, debouncedSearch, sortBy, sortOrder, filterAction, filterTable, filterMonth]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, limit, sortBy, sortOrder]);
+  }, [debouncedSearch, limit, sortBy, sortOrder, filterAction, filterTable, filterMonth]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -176,8 +266,10 @@ export default function StaffAuditsManagement() {
         </header>
 
         <main className="p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
+          <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
+            
             <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
+        
               <div className="relative w-full max-w-xs shrink-0">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
                 <input
@@ -189,18 +281,60 @@ export default function StaffAuditsManagement() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-neutral-400">Show:</span>
-                <select
-                  value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value))}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-2.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
-              </div>
+              <CustomDropdown
+                value={filterAction}
+                onChange={setFilterAction}
+                icon={SlidersHorizontal}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[140px]"
+                options={[
+                  { value: '', label: 'All Actions' },
+                  { value: 'CREATE', label: 'CREATE' },
+                  { value: 'UPDATE', label: 'UPDATE' },
+                  { value: 'DELETE', label: 'DELETE' },
+                  { value: 'LOGIN', label: 'LOGIN' },
+                  { value: 'LOGOUT', label: 'LOGOUT' }
+                ]}
+              />
+
+              <CustomDropdown
+                value={filterTable}
+                onChange={setFilterTable}
+                icon={SlidersHorizontal}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[140px]"
+                options={[
+                  { value: '', label: 'All Tables' },
+                  { value: 'beneficiary', label: 'Beneficiary' },
+                  { value: 'donor', label: 'Donor' },
+                  { value: 'pasteurized_milk', label: 'Pasteurized Milk' },
+                  { value: 'pool_milk', label: 'Pool Milk' },
+                  { value: 'raw_milk', label: 'Raw Milk' },
+                  { value: 'request', label: 'Request' },
+                  { value: 'request_bottles', label: 'Request Bottles' },
+                  { value: 'user', label: 'User' }
+                ]}
+              />
+
+              <CustomDropdown
+                value={filterMonth}
+                onChange={setFilterMonth}
+                icon={SlidersHorizontal}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[140px]"
+                options={getMonthOptions()}
+              />
+
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-semibold text-neutral-400">Show:</span>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value) || 1)}
+                className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
+                data-testid="limit-input"
+              />
             </div>
           </div>
 
@@ -237,7 +371,7 @@ export default function StaffAuditsManagement() {
                     </tr>
                   ) : audits.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-neutral-400">No audit records found matching your search.</td>
+                      <td colSpan={5} className="text-center py-12 text-neutral-400">No audit records found matching your filters.</td>
                     </tr>
                   ) : (
                     audits.map((audit) => (
