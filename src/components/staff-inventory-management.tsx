@@ -333,7 +333,7 @@ export default function StaffInventoryManagement() {
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('btl_id')}>
-                      Item ID {sortBy === 'btl_id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      ID {sortBy === 'btl_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('batch_id')}>
                       Batch ID {sortBy === 'batch_id' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -428,20 +428,6 @@ export default function StaffInventoryManagement() {
             </div>
 
             <div className="p-6 space-y-6">
-              
-              <div className="flex items-center gap-4">
-                <div className="size-16 rounded-2xl bg-neutral-100 border border-neutral-200 flex items-center justify-center text-brand-teal">
-                  <Milk className="size-8" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-item-id">Bottle ID: {selectedItem.btl_id}</h4>
-                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
-                    Batch: <span className="text-neutral-900">{selectedItem.batch_milk?.batch_id || 'N/A'}</span>
-                  </p>
-                </div>
-              </div>
-
-              <hr className="border-neutral-100" />
 
               {/* Contextual Locked/Dispensed Alert */}
               {selectedItem.dispense_status?.toLowerCase() === 'dispensed' && (
@@ -456,6 +442,16 @@ export default function StaffInventoryManagement() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">ID</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-item-id">{selectedItem.btl_id}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Batch ID</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedItem.batch_milk?.batch_id || 'N/A'}</div>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-5">
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Volume</label>

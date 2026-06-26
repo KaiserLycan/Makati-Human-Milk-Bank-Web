@@ -399,7 +399,7 @@ export default function StaffPoolManagement() {
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('id')} data-testid="th-id">
-                      PID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      ID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('datePooled')} data-testid="th-date">
                       Date Pooled {sortBy === 'datePooled' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -543,7 +543,7 @@ export default function StaffPoolManagement() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">PID</label>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">ID</label>
                       <div className="text-sm font-bold text-neutral-800" data-testid="modal-batch-id">{selectedPool.pid}</div>
                     </div>
                     <div>
