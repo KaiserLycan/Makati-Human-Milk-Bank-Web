@@ -35,9 +35,13 @@ export default function StaffAuditsManagement() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
 
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
     setAudits(loadAudits());
     setProfile(loadProfile());
+    const timer = setTimeout(() => setIsLoading(false), 300);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -189,16 +193,15 @@ export default function StaffAuditsManagement() {
               {/* Limit Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-neutral-400">Show:</span>
-                <select
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
                   value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value))}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-2.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
+                  onChange={(e) => setLimit(Math.min(Number(e.target.value) || 1, 100))}
+                  className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
                   data-testid="limit-select"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
+                />
               </div>
             </div>
           </div>
@@ -225,27 +228,41 @@ export default function StaffAuditsManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {pagedItems.map((audit) => (
-                    <tr
-                      key={audit.id}
-                      onClick={() => setSelectedAudit(audit)}
-                      className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
-                      data-testid={`row-${audit.id}`}
-                    >
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{audit.id}</td>
-                      <td className="px-6 py-4.5 text-neutral-500">{audit.timestamp}</td>
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{audit.user}</td>
-                      <td className="px-6 py-4.5 text-neutral-800 font-bold">{audit.action}</td>
-                      <td className="px-6 py-4.5 text-neutral-500 font-normal truncate max-w-[200px]">{audit.details}</td>
-                    </tr>
-                  ))}
-
-                  {pagedItems.length === 0 && (
+                  {isLoading ? (
+                    [...Array(5)].map((_, i) => (
+                      <tr key={`skel-${i}`} className="animate-pulse pointer-events-none">
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-16"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-32"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-16"></div></td>
+                      </tr>
+                    ))
+                  ) : pagedItems.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-neutral-400">
-                        No audit records found matching current criteria.
+                      <td colSpan={5} className="text-center py-16 text-neutral-400 font-medium font-sans animate-in fade-in duration-200">
+                        No records match the active search and filter settings.
                       </td>
                     </tr>
+                  ) : (
+                    pagedItems.map((audit) => (
+                      <tr
+                        key={audit.id}
+                        onClick={() => setSelectedAudit(audit)}
+                        className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
+                        data-testid={`row-${audit.id}`}
+                      >
+                        <td className="px-6 py-4.5 font-bold text-neutral-900">{audit.id}</td>
+                        <td className="px-6 py-4.5 font-bold text-neutral-500 font-mono">
+                          {new Date(audit.timestamp).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4.5 text-neutral-600">{audit.user}</td>
+                        <td className="px-6 py-4.5 text-neutral-900">{audit.action}</td>
+                        <td className="px-6 py-4.5 text-neutral-400 font-medium font-mono text-[10px]">
+                          View details
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -253,15 +270,15 @@ export default function StaffAuditsManagement() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
+              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500 font-sans">
                 <span>
                   Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries
                 </span>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     data-testid="prev-page-btn"
                   >
                     <ChevronLeft className="size-4" />
@@ -269,7 +286,7 @@ export default function StaffAuditsManagement() {
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     data-testid="next-page-btn"
                   >
                     <ChevronRight className="size-4" />
