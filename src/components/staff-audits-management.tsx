@@ -366,9 +366,16 @@ export default function StaffAuditsManagement() {
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
                   {isLoading ? (
-                    <tr>
-                      <td colSpan={5} className="text-center py-12 text-neutral-400">Loading database records...</td>
-                    </tr>
+                    [...Array(limit || 5)].map((_, i) => (
+                      <tr key={`skel-${i}`} className="animate-pulse pointer-events-none">
+                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-32"></div></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-48"></div></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
+                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
+                      </tr>
+                    ))
+                    
                   ) : audits.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-12 text-neutral-400">No audit records found matching your filters.</td>
