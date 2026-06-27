@@ -11,7 +11,8 @@ import {
   ShieldAlert,
   ArrowRight,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Calendar
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
@@ -112,19 +113,33 @@ export default function StaffAuditsManagement() {
   const [filterAction, setFilterAction] = useState('');
   const [filterTable, setFilterTable] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
+  const [filterYear, setFilterYear] = useState('');
 
   const [serverTotalItems, setServerTotalItems] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
 
-  // Generate the last 12 months for the dropdown dynamically
-  const getMonthOptions = () => {
-    const options = [{ value: '', label: 'All Time' }];
-    const today = new Date();
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      options.push({ value, label });
+  // --- Options Generators ---
+  const monthOptions = [
+    { value: '', label: 'All Months' },
+    { value: '1', label: 'January' },
+    { value: '2', label: 'February' },
+    { value: '3', label: 'March' },
+    { value: '4', label: 'April' },
+    { value: '5', label: 'May' },
+    { value: '6', label: 'June' },
+    { value: '7', label: 'July' },
+    { value: '8', label: 'August' },
+    { value: '9', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' }
+  ];
+
+  const getYearOptions = () => {
+    const currentYear = new Date().getFullYear();
+    const options = [{ value: '', label: 'All Years' }];
+    for (let i = 0; i <= 5; i++) { // Shows current year down to 5 years ago
+      options.push({ value: String(currentYear - i), label: String(currentYear - i) });
     }
     return options;
   };
@@ -144,10 +159,20 @@ export default function StaffAuditsManagement() {
         
         let start_date = undefined;
         let end_date = undefined;
-        if (filterMonth) {
-          const [year, month] = filterMonth.split('-');
-          start_date = new Date(Number(year), Number(month) - 1, 1).toISOString();
-          end_date = new Date(Number(year), Number(month), 0, 23, 59, 59, 999).toISOString();
+
+        // Smarter Date Logic handling separate Month and Year
+        if (filterYear || filterMonth) {
+          const y = filterYear ? Number(filterYear) : new Date().getFullYear();
+          
+          if (filterMonth) {
+            const m = Number(filterMonth);
+            start_date = new Date(y, m - 1, 1).toISOString();
+            end_date = new Date(y, m, 0, 23, 59, 59, 999).toISOString();
+          } else {
+            // Only year is selected, grab the whole year
+            start_date = new Date(y, 0, 1).toISOString();
+            end_date = new Date(y, 11, 31, 23, 59, 59, 999).toISOString();
+          }
         }
 
         const response = await api.get('/api/audit-logs', {
@@ -185,11 +210,12 @@ export default function StaffAuditsManagement() {
     };
 
     fetchAudits();
-  }, [page, limit, debouncedSearch, sortBy, sortOrder, filterAction, filterTable, filterMonth]);
+  }, [page, limit, debouncedSearch, sortBy, sortOrder, filterAction, filterTable, filterMonth, filterYear]);
 
+  // Reset to page 1 if any filter changes
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, limit, sortBy, sortOrder, filterAction, filterTable, filterMonth]);
+  }, [debouncedSearch, limit, sortBy, sortOrder, filterAction, filterTable, filterMonth, filterYear]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -269,7 +295,7 @@ export default function StaffAuditsManagement() {
           <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
             
             <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
-        
+              
               <div className="relative w-full max-w-xs shrink-0">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-400" />
                 <input
@@ -285,7 +311,7 @@ export default function StaffAuditsManagement() {
                 value={filterAction}
                 onChange={setFilterAction}
                 icon={SlidersHorizontal}
-                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[140px]"
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[130px]"
                 options={[
                   { value: '', label: 'All Actions' },
                   { value: 'CREATE', label: 'CREATE' },
@@ -300,7 +326,7 @@ export default function StaffAuditsManagement() {
                 value={filterTable}
                 onChange={setFilterTable}
                 icon={SlidersHorizontal}
-                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[140px]"
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[130px]"
                 options={[
                   { value: '', label: 'All Tables' },
                   { value: 'beneficiary', label: 'Beneficiary' },
@@ -317,9 +343,17 @@ export default function StaffAuditsManagement() {
               <CustomDropdown
                 value={filterMonth}
                 onChange={setFilterMonth}
-                icon={SlidersHorizontal}
-                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[140px]"
-                options={getMonthOptions()}
+                icon={Calendar}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[125px]"
+                options={monthOptions}
+              />
+
+              <CustomDropdown
+                value={filterYear}
+                onChange={setFilterYear}
+                icon={Calendar}
+                triggerClassName="text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl pl-9 pr-4 py-2.5 transition-all min-w-[110px]"
+                options={getYearOptions()}
               />
 
             </div>
@@ -375,7 +409,6 @@ export default function StaffAuditsManagement() {
                         <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
                       </tr>
                     ))
-                    
                   ) : audits.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-12 text-neutral-400">No audit records found matching your filters.</td>
@@ -441,6 +474,7 @@ export default function StaffAuditsManagement() {
                 <X className="size-5" />
               </button>
             </div>
+            
             <div className="p-6 space-y-6">
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-5">
@@ -473,7 +507,6 @@ export default function StaffAuditsManagement() {
                   </div>
                 </div>
 
-                {/* JSON Data blocks take up full width below the grid */}
                 {selectedAudit.old_data && (
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Old Data</label>
