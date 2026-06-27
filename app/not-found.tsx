@@ -37,7 +37,7 @@ export default function NotFound() {
         <div className="flex flex-col gap-8 w-full max-w-lg mx-auto text-center items-center justify-center animate-in fade-in duration-300">
           <div className="flex flex-col gap-3">
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-sans font-bold text-neutral-950 tracking-tight leading-[1.1]">
-              404 - Not Found
+              404 <br /> Not Found
             </h1>
             <p className="text-neutral-600 font-sans text-sm sm:text-base leading-relaxed max-w-md mx-auto">
               Sorry, we couldn’t find the page you’re looking for. It might have been moved, deleted, or the URL may be incorrect.
