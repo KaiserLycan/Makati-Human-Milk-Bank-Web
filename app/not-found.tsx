@@ -2,17 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Home, ChevronLeft } from 'lucide-react';
+import { Home } from 'lucide-react';
 
 export default function NotFound() {
   const [mounted, setMounted] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    if (typeof window !== 'undefined') {
-      setIsLoggedIn(localStorage.getItem('mhmb_logged_in') === 'true');
-    }
   }, []);
 
   if (!mounted) return null;
@@ -46,20 +42,12 @@ export default function NotFound() {
 
           <div className="flex flex-col gap-4 w-full max-w-sm">
             <Link
-              href={isLoggedIn ? '/work/dashboard' : '/'}
+              href="/"
               className="bg-brand-teal hover:bg-brand-teal-dark text-white font-sans font-bold text-base h-[55px] rounded-[10px] transition-all flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(0,175,185,0.2)] hover:shadow-[0_4px_18px_rgba(0,175,185,0.35)] cursor-pointer text-center w-full"
             >
               <Home className="size-5" />
-              {isLoggedIn ? 'Back to Dashboard' : 'Back to Home'}
+              Go to Main Page
             </Link>
-            
-            <button
-              onClick={() => window.history.back()}
-              className="border border-neutral-400 bg-white text-neutral-800 font-sans font-bold text-base h-[55px] rounded-[10px] transition-all flex items-center justify-center gap-2 hover:bg-neutral-50 cursor-pointer shadow-sm w-full"
-            >
-              <ChevronLeft className="size-5" />
-              Go Back
-            </button>
           </div>
 
           <div className="text-center">
