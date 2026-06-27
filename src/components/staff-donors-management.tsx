@@ -77,7 +77,10 @@ interface Applicant {
   id: string;
   name: string;
   application_status: 'Approved' | 'Pending' | 'Rejected';
+  status: 'Active' | 'Inactive' | 'Pending';
   dateApplied: string;
+  dateJoined: string;
+  lastDonation: string;
   email: string;
   dob: string;
   occupation: string;
@@ -498,6 +501,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
           dateApplied: d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : 'N/A',
           dob: d.birth_date ? d.birth_date.split('T')[0] : 'N/A',
+          lastDonation: donationInfo.last_donation || 'N/A',
           occupation: personal.occupation || '',
           maritalStatus: personal.marital_status || '',
           address: personal.home_address || '',
