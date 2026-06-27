@@ -19,7 +19,6 @@ import StaffNotificationBell from './ui/staff-notification-bell';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../utils/api';
 
-// --- CUSTOM DROPDOWN COMPONENT ---
 const CustomDropdown = ({ 
   value, 
   onChange, 
@@ -101,15 +100,14 @@ export default function StaffAuditsManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // --- Search & Pagination State ---
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [sortBy, setSortBy] = useState('performed_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
+  const [limitWarning, setLimitWarning] = useState(false);
 
-  // --- Dropdown Filter States ---
   const [filterAction, setFilterAction] = useState('');
   const [filterTable, setFilterTable] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
@@ -118,7 +116,6 @@ export default function StaffAuditsManagement() {
   const [serverTotalItems, setServerTotalItems] = useState(0);
   const [serverTotalPages, setServerTotalPages] = useState(1);
 
-  // --- Options Generators ---
   const monthOptions = [
     { value: '', label: 'All Months' },
     { value: '1', label: 'January' },
@@ -160,7 +157,6 @@ export default function StaffAuditsManagement() {
         let start_date = undefined;
         let end_date = undefined;
 
-        // Smarter Date Logic handling separate Month and Year
         if (filterYear || filterMonth) {
           const y = filterYear ? Number(filterYear) : new Date().getFullYear();
           
@@ -212,7 +208,6 @@ export default function StaffAuditsManagement() {
     fetchAudits();
   }, [page, limit, debouncedSearch, sortBy, sortOrder, filterAction, filterTable, filterMonth, filterYear]);
 
-  // Reset to page 1 if any filter changes
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, limit, sortBy, sortOrder, filterAction, filterTable, filterMonth, filterYear]);
@@ -365,10 +360,27 @@ export default function StaffAuditsManagement() {
                 min={1}
                 max={100}
                 value={limit}
-                onChange={(e) => setLimit(Number(e.target.value) || 1)}
-                className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  if (val > 100) {
+                    setLimit(100); // Force it back down to 100
+                    setLimitWarning(true);
+                    setTimeout(() => setLimitWarning(false), 3000);
+                  } else {
+                    setLimit(val || 1);
+                    setLimitWarning(false);
+                  }
+                }}
+                className={`w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none transition-all text-center ${
+                  limitWarning ? 'ring-2 ring-red-500/50 bg-red-50 text-red-600' : 'focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal'
+                }`}
                 data-testid="limit-input"
               />
+              {limitWarning && (
+                <div className="absolute -top-10 right-0 bg-red-50 border border-red-200 text-red-600 text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-in fade-in slide-in-from-bottom-2 z-10 pointer-events-none">
+                  Maximum 100 logs only
+                </div>
+              )}
             </div>
           </div>
 
