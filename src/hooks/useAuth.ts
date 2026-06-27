@@ -12,6 +12,7 @@ export interface User {
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [serverDown, setServerDown] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,11 +34,17 @@ export function useAuth() {
         const response = await api.get('/api/users/profile');
         if (isMounted) {
           setUser(response.data.data);
+          setServerDown(false);
         }
       } catch (err: any) {
         console.error('Failed to fetch user profile:', err);
-        // If unauthorized, clean up session
-        if (err?.response?.status === 401) {
+        if (!err?.response) {
+          // Network error — server is unreachable
+          if (isMounted) {
+            setServerDown(true);
+          }
+        } else if (err?.response?.status === 401) {
+          // If unauthorized, clean up session
           if (typeof window !== 'undefined') {
             localStorage.removeItem('mhmb_logged_in');
             localStorage.removeItem('mhmb_profile');
@@ -57,5 +64,5 @@ export function useAuth() {
     };
   }, []);
 
-  return { user, isLoading };
+  return { user, isLoading, serverDown };
 }
