@@ -473,8 +473,8 @@ export default function StaffAuditsManagement() {
 
       {selectedAudit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
-            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden max-h-[90vh]">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <History className="size-5 text-brand-teal" />
                 <h3 className="text-lg font-bold text-neutral-900">Audit Log Details</h3>
@@ -487,7 +487,7 @@ export default function StaffAuditsManagement() {
               </button>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto">
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-5">
                   <div>
