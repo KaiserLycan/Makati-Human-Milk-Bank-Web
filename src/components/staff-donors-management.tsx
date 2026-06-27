@@ -415,10 +415,11 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     return msg;
   };
 
-  const handleDonorAction = async (action: 'approve' | 'reject' | 'toggle' | 'delete', dtn: string) => {
+  const handleDonorAction = async (action: 'approve' | 'reject' | 'toggle' | 'delete' | 'revert', dtn: string) => {
     try {
       if (action === 'approve') await api.patch(`/api/donors/approve/${dtn}`);
       else if (action === 'reject') await api.patch(`/api/donors/reject/${dtn}`);
+      else if (action === 'revert') await api.patch(`/api/donors/revert/${dtn}`);
       else if (action === 'toggle') await api.patch(`/api/donors/toggle-status/${dtn}`);
       else if (action === 'delete') await api.delete(`/api/donors/${dtn}`);
 
@@ -452,31 +453,33 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     }
   };
   const fetchAllDonors = async () => {
+    setIsLoadingData(true);
     try {
-      setIsLoadingData(true);
-      const response = await api.get('/api/donors');
+      // 1. CONSTRUCT QUERY
+      let queryParam = '';
+      if (statusFilter !== 'All') {
+        const key = mode === 'donors' ? 'status' : 'application_status';
+        queryParam = `?${key}=${statusFilter.toLowerCase()}`;
+      }
 
-      // 1. THE HEAT-SEEKING MISSILE
-      // This logic digs into the backend response and finds the actual Array
+      // 2. FETCH DATA
+      const response = await api.get(`/api/donors${queryParam}`);
+      
+      // THE HEAT-SEEKING MISSILE (Refined for pagination support)
       let rawArray: any[] = [];
-      const payload = response.data?.data; // This is the { ... } object from your screenshot
-
+      const payload = response.data?.data;
+      
       if (Array.isArray(payload)) {
         rawArray = payload;
       } else if (payload && typeof payload === 'object') {
-        // Look through all the keys in the object to find the one holding the array (like 'donors' or 'results')
-        const arrayKey = Object.keys(payload).find(key => Array.isArray(payload[key]));
-        if (arrayKey) {
-          rawArray = payload[arrayKey];
+        if (Array.isArray(payload.data)) {
+          rawArray = payload.data;
+        } else {
+          const arrayKey = Object.keys(payload).find(key => Array.isArray(payload[key]));
+          if (arrayKey) rawArray = payload[arrayKey];
         }
       }
 
-      // If the database is completely empty, rawArray will just be [], which is safe!
-      if (!rawArray) {
-        rawArray = [];
-      }
-
-      // 2. THE TRANSLATOR
       const mappedData = rawArray.map((d: any) => {
         const profile = d.profile || {};
         const personal = profile.personal_information || {};
@@ -485,14 +488,16 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         const medicalInfo = profile.medical_information || {};
 
         return {
-          id: d.dtn,
+          id: d.dtn.toString(),
           name: d.name,
-          status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Active' : 'Inactive'),
-          application_status: d.application_status === 'pending' ? 'Pending' : (d.application_status === 'rejected' ? 'Rejected' : 'Approved'),
+          // If approved, status comes from account_status. Otherwise, it's Pending/Rejected.
+          status: d.application_status === 'approved' 
+            ? (d.account_status === 'active' ? 'Active' : 'Inactive') 
+            : (d.application_status === 'pending' ? 'Pending' : 'Rejected'),
+          application_status: d.application_status.charAt(0).toUpperCase() + d.application_status.slice(1),
           dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
-          dateApplied: d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : (d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A'),
-          lastDonation: donationInfo.last_donation || 'N/A',
-          dob: d.birth_date ? new Date(d.birth_date).toISOString().split('T')[0] : 'N/A',
+          dateApplied: d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : 'N/A',
+          dob: d.birth_date ? d.birth_date.split('T')[0] : 'N/A',
           occupation: personal.occupation || '',
           maritalStatus: personal.marital_status || '',
           address: personal.home_address || '',
@@ -537,15 +542,20 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         };
       });
 
-      // 3. SORT AND SPLIT
-      const fetchedApplicants = mappedData.filter((d: any) => d.status === 'Pending') as Applicant[];
-      const fetchedDonors = mappedData.filter((d: any) => d.status !== 'Pending') as Donor[];
+      // 3. SPLIT
+      const fetchedApplicants = mappedData.filter((d: any) => 
+        d.application_status === 'Pending' || d.application_status === 'Rejected'
+      ) as Applicant[];
+      const fetchedDonors = mappedData.filter((d: any) => 
+        d.application_status === 'Approved'
+      ) as Donor[];
 
       setApplicants(fetchedApplicants);
       setDonors(fetchedDonors);
 
     } catch (error) {
       console.error("Failed to fetch donors:", error);
+      showFeedback("Failed to load records from the server.", "error");
     } finally {
       setIsLoadingData(false);
     }
@@ -641,87 +651,46 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     return () => clearInterval(interval);
   }, []);
 
-  // Filter & Sort Logic
-  const getProcessedDonors = () => {
-    let result = [...donors];
+  // Filter & Sort Logic (Unified)
+  const getProcessedItems = () => {
+    let result: (Donor | Applicant)[] = mode === 'donors' ? [...donors] : [...applicants];
 
-    // Search filter (id or name)
+    // Local Search
     if (search.trim() !== '') {
-      result = result.filter(
-        (d) =>
-          d.name.toLowerCase().includes(search.toLowerCase()) ||
-          d.id.toLowerCase().includes(search.toLowerCase())
+      result = result.filter((d) => 
+        d.name.toLowerCase().includes(search.toLowerCase()) || 
+        d.id.toLowerCase().includes(search.toLowerCase())
       );
     }
 
-    // Status filter
-    if (statusFilter !== 'All') {
-      result = result.filter((d) => d.status === statusFilter);
-    }
+    // Local Sorting
+    result.sort((a: any, b: any) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
 
-    // Sorting
-    result.sort((a, b) => {
-      let aVal = a[sortBy as keyof Donor];
-      let bVal = b[sortBy as keyof Donor];
-
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal as string).toLowerCase();
+      // Handle specific column mapping if needed
+      if (sortBy === 'status' && mode === 'donors') {
+        valA = a.status;
+        valB = b.status;
+      } else if (sortBy === 'application_status' && mode === 'applicants') {
+        valA = a.application_status;
+        valB = b.application_status;
       }
 
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
 
     return result;
   };
 
-  const getProcessedApplicants = () => {
-    let result = [...applicants];
-
-    // Search filter
-    if (search.trim() !== '') {
-      result = result.filter(
-        (a) =>
-          a.name.toLowerCase().includes(search.toLowerCase()) ||
-          a.id.toLowerCase().includes(search.toLowerCase()) ||
-          a.email.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    // Application Status filter
-    if (statusFilter !== 'All') {
-      result = result.filter((a) => a.application_status === statusFilter);
-    }
-
-    // Sorting
-    result.sort((a, b) => {
-      let aVal = a[sortBy as keyof Applicant];
-      let bVal = b[sortBy as keyof Applicant];
-
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal as string).toLowerCase();
-      }
-
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  };
-
-  const processedDonors = getProcessedDonors();
-  const processedApplicants = getProcessedApplicants();
+  const processedItems = getProcessedItems();
 
   // Pagination bounds
-  const totalItems = mode === 'donors' ? processedDonors.length : processedApplicants.length;
+  const totalItems = processedItems.length;
   const totalPages = Math.ceil(totalItems / limit) || 1;
-  const pagedItems = mode === 'donors'
-    ? processedDonors.slice((page - 1) * limit, page * limit)
-    : processedApplicants.slice((page - 1) * limit, page * limit);
+  const pagedItems = processedItems.slice((page - 1) * limit, page * limit);
 
   // Reset page when filter changes
   useEffect(() => {
@@ -736,6 +705,39 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       setSortBy(column);
       setSortOrder('asc');
     }
+  };
+
+  const getProcessedDonors = () => {
+    let result = mode === 'donors' ? [...donors] : [...applicants];
+
+    // Local Search
+    if (search.trim() !== '') {
+      result = result.filter((d) => 
+        d.name.toLowerCase().includes(search.toLowerCase()) || 
+        d.id.toLowerCase().includes(search.toLowerCase())
+      );
+    }
+
+    // Local Sorting
+    result.sort((a: any, b: any) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+
+      // Handle specific column mapping if needed
+      if (sortBy === 'status' && mode === 'donors') {
+        valA = a.status;
+        valB = b.status;
+      } else if (sortBy === 'application_status' && mode === 'applicants') {
+        valA = a.application_status;
+        valB = b.application_status;
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
@@ -1051,13 +1053,13 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
                   {isLoadingData ? (
                     // Skeleton Loading Rows
-                    [...Array(5)].map((_, index) => (
+                    [...Array(limit)].map((_, index) => (
                       <tr key={`skeleton-${index}`} className="animate-pulse border-b border-neutral-100">
-                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-10"></div></td>
-                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-32"></div></td>
-                        <td className="px-8 py-4.5"><div className="h-5 bg-neutral-100 rounded-full w-20"></div></td>
-                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-24"></div></td>
-                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-24"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-100 rounded-lg w-10"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-100 rounded-lg w-32"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-5 bg-neutral-50 rounded-full w-20"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-100 rounded-lg w-24"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-100 rounded-lg w-24"></div></td>
                       </tr>
                     ))
                   ) : pagedItems.length === 0 ? (
@@ -1084,8 +1086,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                         <td className="px-8 py-4.5 text-neutral-500">
                           {mode === 'donors' ? (item as Donor).dateJoined : (item as Applicant).dateApplied}
                         </td>
-                        <td className="px-8 py-4.5 text-neutral-500">
-                          {mode === 'donors' ? (item as Donor).lastDonation : (item as Applicant).email}
+                        <td className="px-8 py-4.5 text-neutral-500 text-right pr-12">
+                          {(item as any).email || (item as any).lastDonation}
                         </td>
                       </tr>
                     ))
@@ -1227,20 +1229,41 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     </button>
                   ) : (
                     <>
-                      <button
-                        onClick={() => handleDonorAction('approve', selectedApplicant!.id)}
-                        className="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm"
-                        data-testid="approve-profile-btn"
-                      >
-                        Approve Application
-                      </button>
-                      <button
-                        onClick={() => handleDonorAction('reject', selectedApplicant!.id)}
-                        className="w-full py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-sm"
-                        data-testid="reject-profile-btn"
-                      >
-                        Reject Application
-                      </button>
+                      {selectedApplicant?.application_status === 'Rejected' ? (
+                        <>
+                          <button
+                            onClick={() => handleDonorAction('approve', selectedApplicant!.id)}
+                            className="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm"
+                            data-testid="approve-profile-btn"
+                          >
+                            Approve Profile
+                          </button>
+                          <button
+                            onClick={() => handleDonorAction('revert', selectedApplicant!.id)}
+                            className="w-full py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all shadow-sm"
+                            data-testid="revert-profile-btn"
+                          >
+                            Revert to Pending
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleDonorAction('approve', selectedApplicant!.id)}
+                            className="w-full py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm"
+                            data-testid="approve-profile-btn"
+                          >
+                            Approve Application
+                          </button>
+                          <button
+                            onClick={() => handleDonorAction('reject', selectedApplicant!.id)}
+                            className="w-full py-2.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl transition-all shadow-sm"
+                            data-testid="reject-profile-btn"
+                          >
+                            Reject Application
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
 
