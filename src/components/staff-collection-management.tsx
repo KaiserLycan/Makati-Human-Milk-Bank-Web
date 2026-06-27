@@ -117,6 +117,7 @@ export default function StaffCollectionManagement() {
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<Partial<any>>({});
   const [formError, setFormError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');

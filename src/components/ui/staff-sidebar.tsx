@@ -618,7 +618,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                     {selectedImagePreview || profile?.profile_image_url ? (
                       <img
-                        src={selectedImagePreview || profile.profile_image_url}
+                        src={selectedImagePreview || profile?.profile_image_url || ''}
                         alt="User Profile Preview"
                         className="size-28 rounded-full object-cover border border-neutral-200 shadow-inner group-hover:opacity-75 transition-opacity"
                       />

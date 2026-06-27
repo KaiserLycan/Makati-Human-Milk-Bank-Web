@@ -484,8 +484,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         };
       });
 
-      setDonors(mappedData.filter((d: any) => d.application_status === 'Approved'));
-      setApplicants(mappedData.filter((d: any) => d.application_status === 'Pending' || d.application_status === 'Rejected'));
+      setDonors(mappedData.filter((d: any) => d.application_status === 'Approved') as Donor[]);
+      setApplicants(mappedData.filter((d: any) => d.application_status === 'Pending' || d.application_status === 'Rejected') as Applicant[]);
 
     } catch (error) {
       console.error("Failed to fetch donors:", error);
