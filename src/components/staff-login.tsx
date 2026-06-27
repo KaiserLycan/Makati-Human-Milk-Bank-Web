@@ -64,7 +64,7 @@ export default function StaffLogin({ onLoginSuccess }: StaffLoginProps) {
       // Track active session locally
       localStorage.setItem('mhmb_logged_in', 'true');
 
-      setSuccess('Login successful! Redirecting to staff portal...');
+      setSuccess('Login successful!');
 
       if (onLoginSuccess) {
         onLoginSuccess(employeeEmail);
