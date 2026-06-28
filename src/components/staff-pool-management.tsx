@@ -15,7 +15,8 @@ import {
   Edit2,
   Trash2,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import StaffSidebar from './ui/staff-sidebar';
@@ -121,6 +122,14 @@ export default function StaffPoolManagement() {
   // Pasteurize Form State
   const [isPasteurizeOpen, setIsPasteurizeOpen] = useState(false);
   const [pasteurizeData, setPasteurizeData] = useState<any>({});
+
+  // Inline feedback toast (replaces alert())
+  const [actionFeedback, setActionFeedback] = useState<{ message: string | string[]; type: 'success' | 'error' } | null>(null);
+  const showFeedback = (message: string | string[], type: 'success' | 'error' = 'success') => {
+    setActionFeedback({ message, type });
+    const duration = type === 'error' && Array.isArray(message) ? 6000 : 3500;
+    setTimeout(() => setActionFeedback(null), duration);
+  };
   const [pasteurizeError, setPasteurizeError] = useState('');
   const [isPasteurizing, setIsPasteurizing] = useState(false);
 
@@ -220,8 +229,9 @@ export default function StaffPoolManagement() {
       if (selectedPool && selectedPool.pid === pid) {
         setSelectedPool({ ...selectedPool, milk_status: newStatus as any });
       }
+      showFeedback('Milk status updated successfully', 'success');
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update milk status');
+      showFeedback(error.response?.data?.message || 'Failed to update milk status', 'error');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -282,6 +292,7 @@ export default function StaffPoolManagement() {
     if (!selectedPool) return;
     setPasteurizeData({
       pid: selectedPool.pid,
+      remaining_volume_ml: selectedPool.remaining_volume_ml !== null ? Number(selectedPool.remaining_volume_ml) : Number(selectedPool.actual_volume_ml),
       bottle_count: '',
       volume_per_bottle: '',
       bottle_type: 'ameda',
@@ -296,7 +307,7 @@ export default function StaffPoolManagement() {
     e.preventDefault();
     setIsPasteurizing(true);
     setPasteurizeError('');
-
+  
     try {
       await api.post('/api/pasteurization', {
         pid: Number(pasteurizeData.pid),
@@ -307,6 +318,7 @@ export default function StaffPoolManagement() {
       });
       setIsPasteurizeOpen(false);
       fetchPools();
+      showFeedback('Pasteurization batch created successfully', 'success');
     } catch (err: any) {
       setPasteurizeError(err.response?.data?.message || err.message || 'Failed to create pasteurization batch.');
     } finally {
@@ -332,6 +344,36 @@ export default function StaffPoolManagement() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
+      {/* Toast Notification */}
+      {actionFeedback && (
+        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${actionFeedback.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
+            : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
+          }`}>
+          <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+            {actionFeedback.type === 'success' ? (
+              <Check className="size-4 text-emerald-600" />
+            ) : (
+              <X className="size-4 text-rose-600" />
+            )}
+          </div>
+          <div className="flex-1 text-xs sm:text-sm font-semibold min-w-0">
+            {Array.isArray(actionFeedback.message) ? (
+              <div className="space-y-1">
+                <p className="font-bold text-rose-900">Please correct the following fields:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-rose-700 font-medium">
+                  {actionFeedback.message.map((msg, index) => (
+                    <li key={index} className="break-words">{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <span className="break-words">{actionFeedback.message}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <StaffSidebar activeItem="pool" />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
@@ -533,7 +575,7 @@ export default function StaffPoolManagement() {
                     <p className="mt-0.5 opacity-90">This milk pool is completely processed and all actual volume is bottled.</p>
                   </div>
                 </div>
-              ) : (
+              ) : Number(selectedPool.remaining_volume_ml) !== Number(selectedPool.actual_volume_ml) ? (
                 <div className="p-4 bg-blue-50 border border-blue-100 text-blue-700 text-xs font-semibold rounded-2xl flex items-start gap-3" data-testid="pool-processed-alert">
                   <Info className="size-5 shrink-0" />
                   <div>
@@ -541,7 +583,7 @@ export default function StaffPoolManagement() {
                     <p className="mt-0.5 opacity-90">This milk pool is partially processed with {selectedPool.remaining_volume_ml} mL left to be pasteurized out of {selectedPool.actual_volume_ml} mL.</p>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Left Column: Details */}
@@ -797,16 +839,24 @@ export default function StaffPoolManagement() {
                   />
                 </div>
                 <div>
+                  <div className="p-3 bg-neutral-50 border border-neutral-200/60 rounded-xl text-xs font-bold text-neutral-600 mb-2 flex justify-between">
+                    <span>Remaining Volume:</span>
+                    <span className="text-brand-teal">{pasteurizeData.remaining_volume_ml || 0} mL</span>
+                  </div>
                   <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Volume per Bottle (mL) *</label>
                   <input
                     type="number"
                     required
-                    min={50}
+                    min={1}
+                    max={Number(pasteurizeData.remaining_volume_ml) || undefined}
                     value={pasteurizeData.volume_per_bottle || ''}
                     onChange={(e) => setPasteurizeData({ ...pasteurizeData, volume_per_bottle: e.target.value })}
                     className="w-full text-sm font-bold text-neutral-800 bg-slate-50 border border-neutral-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal transition-all outline-none"
                     placeholder="Enter volume per bottle in mL"
                   />
+                  <p className="mt-1.5 text-[10px] font-bold text-neutral-500">
+                    Must be between 1 mL and {pasteurizeData.remaining_volume_ml || 0} mL (remaining volume of pool)
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-black uppercase tracking-wider text-neutral-500 mb-2">Bottle Type *</label>

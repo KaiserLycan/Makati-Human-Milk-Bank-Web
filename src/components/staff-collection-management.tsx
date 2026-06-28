@@ -16,7 +16,8 @@ import {
   Plus,
   Trash2,
   Edit2,
-  ChevronDown
+  ChevronDown,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import StaffSidebar from './ui/staff-sidebar';
@@ -164,6 +165,14 @@ export default function StaffCollectionManagement() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
+
+  // Inline feedback toast (replaces alert())
+  const [actionFeedback, setActionFeedback] = useState<{ message: string | string[]; type: 'success' | 'error' } | null>(null);
+  const showFeedback = (message: string | string[], type: 'success' | 'error' = 'success') => {
+    setActionFeedback({ message, type });
+    const duration = type === 'error' && Array.isArray(message) ? 6000 : 3500;
+    setTimeout(() => setActionFeedback(null), duration);
+  };
 
   // Pooling modal state
   const [isPoolModalOpen, setIsPoolModalOpen] = useState(false);
@@ -337,8 +346,9 @@ export default function StaffCollectionManagement() {
       if (selectedCollection && selectedCollection.ctn === ctn) {
         setSelectedCollection({ ...selectedCollection, milk_status: newStatus as any });
       }
+      showFeedback('Milk status updated successfully', 'success');
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update milk status');
+      showFeedback(error.response?.data?.message || 'Failed to update milk status', 'error');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -352,8 +362,9 @@ export default function StaffCollectionManagement() {
       if (selectedCollection && selectedCollection.ctn === ctn) {
         setSelectedCollection({ ...selectedCollection, qat_status: newStatus as any });
       }
+      showFeedback('QAT status updated successfully', 'success');
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update QAT status');
+      showFeedback(error.response?.data?.message || 'Failed to update QAT status', 'error');
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -509,6 +520,36 @@ export default function StaffCollectionManagement() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
+      {/* Toast Notification */}
+      {actionFeedback && (
+        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${actionFeedback.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
+            : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
+          }`}>
+          <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+            {actionFeedback.type === 'success' ? (
+              <Check className="size-4 text-emerald-600" />
+            ) : (
+              <X className="size-4 text-rose-600" />
+            )}
+          </div>
+          <div className="flex-1 text-xs sm:text-sm font-semibold min-w-0">
+            {Array.isArray(actionFeedback.message) ? (
+              <div className="space-y-1">
+                <p className="font-bold text-rose-900">Please correct the following fields:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-rose-700 font-medium">
+                  {actionFeedback.message.map((msg, index) => (
+                    <li key={index} className="break-words">{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <span className="break-words">{actionFeedback.message}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <StaffSidebar activeItem="collection" />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
