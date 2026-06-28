@@ -59,15 +59,9 @@ export default function SelectProgram({
           {/* Left Column: Program Selection Cards */}
           <div className="lg:col-span-6 flex flex-col gap-8 w-full">
             <div className="flex flex-col gap-2">
-              <span className="text-brand-teal font-sans font-bold tracking-wider uppercase text-sm">
-                Get Started
-              </span>
               <h1 className="text-3xl sm:text-4xl font-sans font-bold text-neutral-900 tracking-tight">
                 Choose Your Pathway
               </h1>
-              <p className="text-neutral-500 font-sans text-sm sm:text-base max-w-lg">
-                Join the Makati Human Milk Bank today. Select whether you want to save lives by donating expressed breast milk or request life-saving nutrition for a high-risk infant.
-              </p>
             </div>
 
             <div className="flex flex-col gap-6">

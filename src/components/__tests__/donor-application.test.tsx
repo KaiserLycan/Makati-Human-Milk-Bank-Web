@@ -25,19 +25,16 @@ describe('DonorApplication Component', () => {
     jest.clearAllMocks();
   });
 
-  it('renders all form section titles and fields', () => {
+  it('renders all form section titles and fields by progressing through steps', () => {
     render(<DonorApplication onSubmitSuccess={mockOnSubmitSuccess} />);
 
     // Verify main page title
     expect(screen.getByText('Donor Program', { selector: 'h1' })).toBeInTheDocument();
 
-    // Verify section titles
+    // Verify section title for Step 1
     expect(screen.getByText('Personal Information')).toBeInTheDocument();
-    expect(screen.getByText('Traveling Information')).toBeInTheDocument();
-    expect(screen.getByText('Donation Information')).toBeInTheDocument();
-    expect(screen.getByText('Medical History Questionnaire')).toBeInTheDocument();
 
-    // Verify text inputs
+    // Verify text inputs for Step 1
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
@@ -47,11 +44,23 @@ describe('DonorApplication Component', () => {
     const suffixSelect = screen.getByLabelText(/suffix/i);
     expect(suffixSelect).toBeInTheDocument();
 
+    // Go to Step 2
+    const nextBtn = screen.getByRole('button', { name: /next/i });
+    fireEvent.click(nextBtn);
+
+    // Verify section titles for Step 2
+    expect(screen.getByText('Traveling Information')).toBeInTheDocument();
+    expect(screen.getByText('Donation Information')).toBeInTheDocument();
+
+    // Go to Step 3
+    fireEvent.click(nextBtn);
+
     // Verify Medical Questionnaire Questions
-    expect(screen.getByText('Tuberculosis')).toBeInTheDocument();
-    expect(screen.getByText('Hepatitis B')).toBeInTheDocument();
-    expect(screen.getByText('Do you smoke?')).toBeInTheDocument();
-    expect(screen.getByText('Was a breast implant placed?')).toBeInTheDocument();
+    expect(screen.getByText('Medical History Questionnaire')).toBeInTheDocument();
+    expect(screen.getByText(/Tuberculosis/i)).toBeInTheDocument();
+    expect(screen.getByText(/Hepatitis B/i)).toBeInTheDocument();
+    expect(screen.getByText(/Do you smoke\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/breast implant/i)).toBeInTheDocument();
 
     // Verify Submit button
     expect(screen.getByRole('button', { name: /submit application/i })).toBeInTheDocument();
@@ -68,6 +77,11 @@ describe('DonorApplication Component', () => {
     const lastNameInput = screen.getByLabelText(/last name/i) as HTMLInputElement;
     fireEvent.change(lastNameInput, { target: { value: 'Doe' } });
     expect(lastNameInput.value).toBe('Doe');
+
+    // Go to step 3
+    const nextBtn = screen.getByRole('button', { name: /next/i });
+    fireEvent.click(nextBtn); // Step 2
+    fireEvent.click(nextBtn); // Step 3
 
     // Click Tuberculosis YES radio button
     const tbYesRadio = screen.getByTestId('tuberculosis-yes') as HTMLInputElement;
@@ -93,6 +107,11 @@ describe('DonorApplication Component', () => {
     fireEvent.change(screen.getByLabelText(/phone number/i), { target: { value: '+639123456789' } });
     fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'maria@example.com' } });
     fireEvent.change(screen.getByLabelText(/home address/i), { target: { value: 'Makati City' } });
+
+    // Go to step 3
+    const nextBtn = screen.getByRole('button', { name: /next/i });
+    fireEvent.click(nextBtn); // Step 2
+    fireEvent.click(nextBtn); // Step 3
 
     // Submit
     const submitBtn = screen.getByRole('button', { name: /submit application/i });

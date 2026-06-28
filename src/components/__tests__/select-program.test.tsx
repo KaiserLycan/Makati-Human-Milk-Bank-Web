@@ -35,11 +35,7 @@ describe('SelectProgram Component', () => {
     );
 
     // Verify main page headers
-    expect(screen.getByText('Get Started')).toBeInTheDocument();
     expect(screen.getByText('Choose Your Pathway')).toBeInTheDocument();
-    expect(
-      screen.getByText(/Join the Makati Human Milk Bank today/i)
-    ).toBeInTheDocument();
 
     // Verify Donor Program Card details
     expect(screen.getByText('Donor Program', { selector: 'h2' })).toBeInTheDocument();

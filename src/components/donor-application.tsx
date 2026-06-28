@@ -675,31 +675,6 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                       )}
                     </div>
     
-                    {/* Form Actions Footer */}
-                    <div className="flex justify-between pt-6 border-t border-neutral-100">
-                      <div>
-                        {registerTab > 1 && (
-                          <button
-                            key="register-prev-btn"
-                            type="button"
-                            onClick={() => setRegisterTab((t) => Math.max(1, t - 1))}
-                            className="px-6 py-2.5 text-sm font-bold text-neutral-600 hover:text-neutral-800 bg-white border border-neutral-200 rounded-xl transition-all cursor-pointer"
-                          >
-                            Previous
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex gap-3">
-                        <button
-                          key="register-next-btn"
-                          type="button"
-                          onClick={() => setRegisterTab((t) => Math.min(3, t + 1))}
-                          className="px-6 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-dark rounded-xl transition-all cursor-pointer"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>
                   </fieldset>
                 </>
               )}
@@ -796,34 +771,46 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                      </div>
                    </div>
      
-                   {/* Form Actions Footer */}
-                   <div className="flex justify-between pt-6 border-t border-neutral-100">
-                     <div>
-                       {registerTab > 1 && (
-                         <button
-                           key="register-prev-btn"
-                           type="button"
-                           onClick={() => setRegisterTab((t) => Math.max(1, t - 1))}
-                           className="px-6 py-2.5 text-sm font-bold text-neutral-600 hover:text-neutral-800 bg-white border border-neutral-200 rounded-xl transition-all cursor-pointer"
-                         >
-                           Previous
-                         </button>
-                       )}
-                     </div>
-     
-                     <div className="flex gap-3">
-                       <button
-                         key="register-submit-btn"
-                         type="submit"
-                         disabled={isSubmitting}
-                         className="bg-brand-teal hover:bg-brand-teal-dark disabled:bg-neutral-300 text-white font-sans font-bold text-base px-10 py-3 rounded-[10px] transition-all duration-200 shadow-[0_4px_14_rgba(0,175,185,0.25)] hover:shadow-[0_4px_20px_rgba(0,175,185,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:translate-y-0 disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer"
-                       >
-                         {isSubmitting ? 'Submitting...' : 'Submit Application'}
-                       </button>
-                     </div>
-                   </div>
                  </div>
                )}
+
+                {/* Form Actions Footer */}
+                <div className="flex justify-between pt-6 border-t border-neutral-100">
+                  <div>
+                    {registerTab > 1 && (
+                      <button
+                        key="register-prev-btn"
+                        type="button"
+                        onClick={() => setRegisterTab((t) => Math.max(1, t - 1))}
+                        className="px-6 py-2.5 text-sm font-bold text-neutral-600 hover:text-neutral-800 bg-white border border-neutral-200 rounded-xl transition-all cursor-pointer"
+                      >
+                        Previous
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    {registerTab < 3 ? (
+                      <button
+                        key="register-next-btn"
+                        type="button"
+                        onClick={() => setRegisterTab((t) => Math.min(3, t + 1))}
+                        className="px-6 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-dark rounded-xl transition-all cursor-pointer"
+                      >
+                        Next
+                      </button>
+                    ) : (
+                      <button
+                        key="register-submit-btn"
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="bg-brand-teal hover:bg-brand-teal-dark disabled:bg-neutral-300 text-white font-sans font-bold text-base px-10 py-3 rounded-[10px] transition-all duration-200 shadow-[0_4px_14_rgba(0,175,185,0.25)] hover:shadow-[0_4px_20px_rgba(0,175,185,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:translate-y-0 disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                      </button>
+                    )}
+                  </div>
+                </div>
 
              </form>
            </>
