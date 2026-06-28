@@ -750,7 +750,7 @@ export default function StaffUsersManagement() {
                   type="email"
                   placeholder="name@mhmb.gov"
                   value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
+                  onChange={(e) => setNewEmail(e.target.value.toLowerCase())}
                   className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all font-medium"
                   data-testid="add-user-email"
                 />
@@ -1022,7 +1022,7 @@ export default function StaffUsersManagement() {
                     <input
                       type="email"
                       value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
+                      onChange={(e) => setEditEmail(e.target.value.toLowerCase())}
                       className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all"
                       data-testid="edit-user-email"
                     />
