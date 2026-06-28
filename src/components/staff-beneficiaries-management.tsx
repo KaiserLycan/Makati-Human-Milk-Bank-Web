@@ -1053,7 +1053,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                         </button>
                       )}
                       
-                      {selectedApplicant?.application_status === 'Pending' && (
+                      {(selectedApplicant?.application_status === 'Pending' || selectedApplicant?.application_status === 'Approved') && (
                         <button
                           onClick={() => handleBeneficiaryAction('reject', selectedApplicant!.id)}
                           className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
@@ -1064,7 +1064,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                         </button>
                       )}
 
-                      {selectedApplicant?.application_status === 'Rejected' && (
+                      {(selectedApplicant?.application_status === 'Rejected' || selectedApplicant?.application_status === 'Approved') && (
                         <button
                           onClick={() => handleBeneficiaryAction('revert', selectedApplicant!.id)}
                           className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"

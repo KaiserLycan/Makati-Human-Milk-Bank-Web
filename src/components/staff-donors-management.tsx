@@ -1213,6 +1213,29 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                             Revert to Pending
                           </button>
                         </>
+                      ) : selectedApplicant?.application_status === 'Approved' ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('revert');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="revert-profile-btn"
+                          >
+                            Revert to Pending
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('reject');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="reject-profile-btn"
+                          >
+                            Reject Application
+                          </button>
+                        </>
                       ) : (
                         <>
                           <button
