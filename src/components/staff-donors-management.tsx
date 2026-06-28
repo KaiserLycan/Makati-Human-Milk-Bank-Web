@@ -405,14 +405,14 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
   const parseValidationErrors = (msg: string): string[] | string => {
     if (!msg) return "";
-    
+
     // Check if it's a validation error list
     if (msg.includes("Invalid request data:") || msg.includes("request data:")) {
       let cleanMsg = msg.replace(/^Invalid request data:\s*/, "").replace(/^request data:\s*/, "");
-      
+
       const parts = cleanMsg.split(/,\s*(?=[a-z_]+:)/);
       const formattedErrors: string[] = [];
-      
+
       const fieldMap: Record<string, string> = {
         name: "Name",
         email: "Email Address",
@@ -437,9 +437,9 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         if (colonIdx !== -1) {
           const field = part.substring(0, colonIdx).trim();
           let errorText = part.substring(colonIdx + 1).trim();
-          
+
           const friendlyField = fieldMap[field] || field;
-          
+
           if (errorText.toLowerCase().includes("invalid email")) {
             errorText = "Please enter a valid email address.";
           } else if (errorText.toLowerCase().includes("invalid phone")) {
@@ -447,16 +447,16 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           } else if (errorText.toLowerCase().includes("must be at least 2 characters")) {
             errorText = "Must be at least 2 characters long.";
           }
-          
+
           formattedErrors.push(`${friendlyField}: ${errorText}`);
         } else {
           formattedErrors.push(part.trim());
         }
       }
-      
+
       return formattedErrors.length > 0 ? formattedErrors : msg;
     }
-    
+
     return msg;
   };
 
@@ -466,7 +466,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       const response = await api.get('/api/donors');
       let rawArray: any[] = [];
       const payload = response.data?.data;
-      
+
       if (Array.isArray(payload)) {
         rawArray = payload;
       } else if (payload && typeof payload === 'object') {
@@ -486,8 +486,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         return {
           id: d.dtn.toString(),
           name: d.name,
-          status: d.application_status === 'approved' 
-            ? (d.account_status === 'active' ? 'Active' : 'Inactive') 
+          status: d.application_status === 'approved'
+            ? (d.account_status === 'active' ? 'Active' : 'Inactive')
             : (d.application_status === 'pending' ? 'Pending' : 'Rejected'),
           application_status: d.application_status.charAt(0).toUpperCase() + d.application_status.slice(1),
           dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
@@ -536,13 +536,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         };
       });
 
-      const fetchedApplicants = mappedData.filter((d: any) => {
-        if (statusFilter === 'Approved') {
-          return d.application_status === 'Approved';
-        }
-        return d.application_status === 'Pending' || d.application_status === 'Rejected';
-      }) as Applicant[];
-      const fetchedDonors = mappedData.filter((d: any) => 
+      const fetchedApplicants = mappedData.filter((d: any) => 
+        d.application_status === 'Pending' || d.application_status === 'Rejected' || d.application_status === 'Approved'
+      ) as Applicant[];
+      const fetchedDonors = mappedData.filter((d: any) =>
         d.application_status === 'Approved'
       ) as Donor[];
 
@@ -619,7 +616,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   // "Hey, as soon as this page loads for the first time, run the fetchAllDonors function automatically!"
   useEffect(() => {
     fetchAllDonors();
-  }, [mode, statusFilter]);
+  }, [mode]);
+
+  // Reset status filter when switching mode
+  useEffect(() => {
+    setStatusFilter('All');
+  }, [mode]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -655,18 +657,30 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
     // Local Search
     if (search.trim() !== '') {
-      result = result.filter((d) => 
-        d.name.toLowerCase().includes(search.toLowerCase()) || 
+      result = result.filter((d) =>
+        d.name.toLowerCase().includes(search.toLowerCase()) ||
         d.id.toLowerCase().includes(search.toLowerCase())
       );
     }
 
     // Local Status Filter
-    if (statusFilter !== 'All') {
-      result = result.filter((d) => {
-        const itemStatus = mode === 'donors' ? d.status : (d as Applicant).application_status;
-        return itemStatus.toLowerCase() === statusFilter.toLowerCase();
-      });
+    if (mode === 'applicants') {
+      if (statusFilter === 'All') {
+        // Show Pending and Rejected when 'All' is selected
+        result = result.filter((d) => 
+          (d as Applicant).application_status === 'Pending' || (d as Applicant).application_status === 'Rejected'
+        );
+      } else {
+        result = result.filter((d) => 
+          (d as Applicant).application_status.toLowerCase() === statusFilter.toLowerCase()
+        );
+      }
+    } else {
+      if (statusFilter !== 'All') {
+        result = result.filter((d) => 
+          d.status.toLowerCase() === statusFilter.toLowerCase()
+        );
+      }
     }
 
     // Local Sorting
@@ -719,10 +733,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       const donorPayload = {
         name: newDonorForm.name,
         email: newDonorForm.email,
-        phone: newDonorForm.phone.startsWith('+') 
-          ? newDonorForm.phone 
-          : newDonorForm.phone.startsWith('0') 
-            ? `+63${newDonorForm.phone.slice(1)}` 
+        phone: newDonorForm.phone.startsWith('+')
+          ? newDonorForm.phone
+          : newDonorForm.phone.startsWith('0')
+            ? `+63${newDonorForm.phone.slice(1)}`
             : `+63${newDonorForm.phone}`,
         birth_date: newDonorForm.dob,
         profile: {
@@ -824,11 +838,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
       {/* Toast Notification */}
       {actionFeedback && (
-        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${
-          actionFeedback.type === 'success'
+        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${actionFeedback.type === 'success'
             ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
             : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
-        }`}>
+          }`}>
           <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
             {actionFeedback.type === 'success' ? (
               <Check className="size-4 text-emerald-600" />
@@ -912,8 +925,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   <div className="absolute z-20 w-full mt-1.5 bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                     <ul className="py-1">
                       {(mode === 'donors'
-                        ? ['All', 'Active', 'Inactive', 'Pending']
-                        : ['All', 'Pending', 'Approved', 'Rejected']
+                        ? ['All', 'Active', 'Inactive']
+                        : ['All', 'Approved', 'Pending', 'Rejected']
                       ).map((status) => (
                         <li key={status}>
                           <button
@@ -922,11 +935,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                               setStatusFilter(status);
                               setIsStatusDropdownOpen(false);
                             }}
-                            className={`block w-full text-left px-4 py-2 text-xs font-bold transition-colors ${
-                              statusFilter === status
+                            className={`block w-full text-left px-4 py-2 text-xs font-bold transition-colors ${statusFilter === status
                                 ? 'bg-brand-teal/10 text-brand-teal'
                                 : 'text-neutral-600 hover:bg-slate-50'
-                            }`}
+                              }`}
                           >
                             {status === 'All' ? 'All Statuses' : status}
                           </button>
@@ -955,15 +967,15 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             {/* New Donor button (mainly on donors list or both) */}
             {mode === 'applicants' && (
               <button
-                  onClick={() => {
-                    setIsEditMode(false);
-                    setEditTargetId(null);
-                    setIsRegisterOpen(true);
-                  }}
-                  className="px-5 py-2.5 text-sm font-bold text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap"
-                  data-testid="new-donor-btn"
-                >
-                  <Plus className="size-4" />
+                onClick={() => {
+                  setIsEditMode(false);
+                  setEditTargetId(null);
+                  setIsRegisterOpen(true);
+                }}
+                className="px-5 py-2.5 text-sm font-bold text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap"
+                data-testid="new-donor-btn"
+              >
+                <Plus className="size-4" />
                 New Donor
               </button>
             )}
@@ -2072,17 +2084,17 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
             <div className="p-6 space-y-4">
               <p className="text-sm text-neutral-600 leading-relaxed">
-                {confirmAction === 'delete' 
+                {confirmAction === 'delete'
                   ? `Are you sure you want to permanently delete profile ${(selectedDonor || selectedApplicant)?.name}? This action cannot be undone and will erase it from the database.`
                   : confirmAction === 'deactivate'
-                  ? `Are you sure you want to deactivate donor ${selectedDonor?.name}? They will no longer be able to donate until reactivated.`
-                  : confirmAction === 'reject'
-                  ? `Are you sure you want to reject application from ${selectedApplicant?.name}?`
-                  : confirmAction === 'approve'
-                  ? `Are you sure you want to approve application from ${selectedApplicant?.name}?`
-                  : confirmAction === 'revert'
-                  ? `Are you sure you want to revert application from ${(selectedDonor || selectedApplicant)?.name} to pending?`
-                  : `Are you sure you want to activate donor ${selectedDonor?.name}?`}
+                    ? `Are you sure you want to deactivate donor ${selectedDonor?.name}? They will no longer be able to donate until reactivated.`
+                    : confirmAction === 'reject'
+                      ? `Are you sure you want to reject application from ${selectedApplicant?.name}?`
+                      : confirmAction === 'approve'
+                        ? `Are you sure you want to approve application from ${selectedApplicant?.name}?`
+                        : confirmAction === 'revert'
+                          ? `Are you sure you want to revert application from ${(selectedDonor || selectedApplicant)?.name} to pending?`
+                          : `Are you sure you want to activate donor ${selectedDonor?.name}?`}
               </p>
 
               {actionError && (
@@ -2102,11 +2114,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 <button
                   onClick={executeConfirmAction}
                   disabled={isActionLoading}
-                  className={`flex-1 h-11 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
-                    confirmAction === 'delete' || confirmAction === 'deactivate' || confirmAction === 'reject' 
-                      ? 'bg-red-500 hover:bg-red-600' 
+                  className={`flex-1 h-11 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${confirmAction === 'delete' || confirmAction === 'deactivate' || confirmAction === 'reject'
+                      ? 'bg-red-500 hover:bg-red-600'
                       : 'bg-brand-teal hover:bg-brand-teal-darker'
-                  }`}
+                    }`}
                 >
                   {isActionLoading ? (
                     <>
