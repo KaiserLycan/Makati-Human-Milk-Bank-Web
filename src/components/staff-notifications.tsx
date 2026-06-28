@@ -29,8 +29,7 @@ interface NotificationItem {
   group: 'Today' | 'Yesterday' | 'Past 7 Days' | 'Past Month' | 'Past Year' | 'Past Years';
 }
 
-const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100] as const;
-type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
+
 
 export default function StaffNotifications() {
   // Collapsible Sub-menus state
@@ -80,8 +79,7 @@ export default function StaffNotifications() {
 
   // ─── Pagination State ────────────────────────────────────────────────────────
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState<PageSize>(10);
-  const [pageSizeDropdownOpen, setPageSizeDropdownOpen] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(10);
 
   // ─── Filter / Search State ───────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -291,10 +289,7 @@ export default function StaffNotifications() {
     [filteredNotifications, startIndex, endIndex],
   );
 
-  const handlePageSizeChange = (size: PageSize) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  };
+
 
   const handleSearchChange = (q: string) => {
     setSearchQuery(q);
@@ -450,48 +445,21 @@ export default function StaffNotifications() {
           {/* Gmail-style Pagination Toolbar  */}
           {!loading && !error && totalItems > 0 && (
             <div className="flex items-center justify-between bg-white border border-neutral-200 rounded-2xl px-4 py-2.5 shadow-sm">
-              {/* Left: page-size dropdown */}
-              <div className="flex items-center gap-2 relative">
-                <span className="text-xs text-neutral-500 font-sans font-medium">Rows per page:</span>
-                <div className="relative">
-                  <button
-                    onClick={() => setPageSizeDropdownOpen(!pageSizeDropdownOpen)}
-                    className="inline-flex items-center justify-between gap-1.5 h-8 px-3 rounded-xl text-xs font-sans font-bold text-neutral-700 bg-slate-50 hover:bg-slate-100 border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all duration-150 cursor-pointer"
-                    data-testid="page-size-select"
-                  >
-                    <span>{pageSize}</span>
-                    <ChevronDown className="size-3.5 text-neutral-500" />
-                  </button>
-
-                  {pageSizeDropdownOpen && (
-                    <>
-                      {/* Invisible backdrop to dismiss dropdown */}
-                      <div
-                        className="fixed inset-0 z-10"
-                        onClick={() => setPageSizeDropdownOpen(false)}
-                      />
-                      {/* Custom styled popup menu */}
-                      <div className="absolute top-full left-0 mt-1.5 w-20 bg-white border border-neutral-200/80 rounded-2xl shadow-xl p-1.5 z-20 animate-in fade-in slide-in-from-top-2 duration-150">
-                        {PAGE_SIZE_OPTIONS.map((size) => (
-                          <button
-                            key={size}
-                            onClick={() => {
-                              handlePageSizeChange(size);
-                              setPageSizeDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-1.5 text-xs font-sans rounded-xl transition-colors ${
-                              size === pageSize
-                                ? 'bg-brand-teal/10 text-brand-teal font-bold'
-                                : 'text-neutral-700 hover:bg-neutral-50 font-medium'
-                            }`}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
+              {/* Left: page-size input spinner */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-neutral-500 font-sans font-medium">Show:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Math.min(Number(e.target.value) || 1, 100));
+                    setCurrentPage(1);
+                  }}
+                  className="w-16 h-8 text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all text-center"
+                  data-testid="page-size-select"
+                />
               </div>
 
               {/* Right: counter + prev/next */}

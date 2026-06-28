@@ -27,7 +27,9 @@ import {
   Refrigerator,
   HandPlatter,
   Droplet,
-  Phone
+  Phone,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { loadProfile, saveProfile, UserProfile } from '../../utils/storage';
 import { reloadWindow } from '../../utils/navigation';
@@ -72,6 +74,9 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalSuccess, setModalSuccess] = useState<string | null>(null);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
@@ -90,6 +95,9 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
       setModalSuccess(null);
       setSelectedImageFile(null);
       setSelectedImagePreview(null);
+      setShowOldPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     }
   }, [isProfileOpen, profile]);
 
@@ -658,13 +666,13 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-500 block">Email Address</label>
                     <input
                       type="email"
                       required
                       value={editForm.email}
-                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value.toLowerCase() })}
                       className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
                     />
                   </div>
@@ -712,35 +720,71 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
                 <div className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-500 block">Current Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={passwordForm.old_password}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, old_password: e.target.value })}
-                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showOldPassword ? 'text' : 'password'}
+                        required
+                        value={passwordForm.old_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, old_password: e.target.value })}
+                        className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 pr-10 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                        data-testid="change-password-old"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowOldPassword(!showOldPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
+                        data-testid="toggle-old-password-visibility"
+                        tabIndex={-1}
+                      >
+                        {showOldPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-500 block">New Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={passwordForm.new_password}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        required
+                        value={passwordForm.new_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                        className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 pr-10 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                        data-testid="change-password-new"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
+                        data-testid="toggle-new-password-visibility"
+                        tabIndex={-1}
+                      >
+                        {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-500 block">Confirm New Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={passwordForm.confirm_password}
-                      onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
-                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        required
+                        value={passwordForm.confirm_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                        className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 pr-10 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                        data-testid="change-password-confirm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 transition-colors cursor-pointer"
+                        data-testid="toggle-confirm-password-visibility"
+                        tabIndex={-1}
+                      >
+                        {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
