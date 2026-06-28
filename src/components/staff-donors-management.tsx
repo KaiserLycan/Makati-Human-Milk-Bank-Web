@@ -536,9 +536,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         };
       });
 
-      const fetchedApplicants = mappedData.filter((d: any) => 
-        d.application_status === 'Pending' || d.application_status === 'Rejected'
-      ) as Applicant[];
+      const fetchedApplicants = mappedData.filter((d: any) => {
+        if (statusFilter === 'Approved') {
+          return d.application_status === 'Approved';
+        }
+        return d.application_status === 'Pending' || d.application_status === 'Rejected';
+      }) as Applicant[];
       const fetchedDonors = mappedData.filter((d: any) => 
         d.application_status === 'Approved'
       ) as Donor[];
@@ -553,11 +556,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       setIsLoadingData(false);
     }
   };
-  // 8. This built-in React hook tells the component: 
-  // "Hey, as soon as this page loads for the first time, run the fetchAllDonors function automatically!"
-  useEffect(() => {
-    fetchAllDonors();
-  }, []);
+
   // --- END OF PASTE ---
 
   // Query Filter States
@@ -615,6 +614,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     needlePrick: 'No' as 'Yes' | 'No',
     repeatedTransfusions: 'No' as 'Yes' | 'No',
   });
+
+  // 8. This built-in React hook tells the component: 
+  // "Hey, as soon as this page loads for the first time, run the fetchAllDonors function automatically!"
+  useEffect(() => {
+    fetchAllDonors();
+  }, [mode, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -908,7 +913,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     <ul className="py-1">
                       {(mode === 'donors'
                         ? ['All', 'Active', 'Inactive', 'Pending']
-                        : ['All', 'Pending', 'Rejected']
+                        : ['All', 'Pending', 'Approved', 'Rejected']
                       ).map((status) => (
                         <li key={status}>
                           <button
