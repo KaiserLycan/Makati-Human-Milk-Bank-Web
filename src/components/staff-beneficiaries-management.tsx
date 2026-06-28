@@ -273,10 +273,10 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       setBeneficiaries(mappedData.filter((b: any) => b.application_status === 'Approved'));
       // Applicants include Pending AND Rejected, and also Approved if statusFilter is Approved
       setApplicants(mappedData.filter((b: any) => {
-        if (statusFilter === 'Approved') {
-          return b.application_status === 'Approved';
-        }
-        return b.application_status === 'Pending' || b.application_status === 'Rejected';
+        if (statusFilter === 'Approved') return b.application_status === 'Approved';
+        if (statusFilter === 'Pending') return b.application_status === 'Pending';
+        if (statusFilter === 'Rejected') return b.application_status === 'Rejected';
+        return b.application_status === 'Pending' || b.application_status === 'Rejected' || b.application_status === 'Approved';
       }));
     } catch (error) {
       console.error("Failed to fetch beneficiaries:", error);
@@ -296,7 +296,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
   // Query Filter States
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(mode === 'applicants' ? 'Pending' : 'All');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -306,6 +306,11 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   useEffect(() => {
     fetchBeneficiariesData();
   }, [mode, statusFilter]); // Re-fetch when mode or dropdown filter changes
+
+  // Reset status filter when switching mode
+  useEffect(() => {
+    setStatusFilter(mode === 'applicants' ? 'Pending' : 'All');
+  }, [mode]);
 
   // Selected item for Detail Modal
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<Beneficiary | null>(null);
@@ -1048,7 +1053,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                         </button>
                       )}
                       
-                      {selectedApplicant?.application_status === 'Pending' && (
+                      {(selectedApplicant?.application_status === 'Pending' || selectedApplicant?.application_status === 'Approved') && (
                         <button
                           onClick={() => handleBeneficiaryAction('reject', selectedApplicant!.id)}
                           className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
@@ -1059,7 +1064,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                         </button>
                       )}
 
-                      {selectedApplicant?.application_status === 'Rejected' && (
+                      {(selectedApplicant?.application_status === 'Rejected' || selectedApplicant?.application_status === 'Approved') && (
                         <button
                           onClick={() => handleBeneficiaryAction('revert', selectedApplicant!.id)}
                           className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"

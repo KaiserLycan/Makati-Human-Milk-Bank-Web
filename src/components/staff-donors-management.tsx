@@ -23,6 +23,8 @@ import {
   Lock,
   Trash2,
   CheckCircle2,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
@@ -78,7 +80,10 @@ interface Applicant {
   id: string;
   name: string;
   application_status: 'Approved' | 'Pending' | 'Rejected';
+  status: 'Active' | 'Inactive' | 'Pending';
   dateApplied: string;
+  dateJoined: string;
+  lastDonation: string;
   email: string;
   dob: string;
   occupation: string;
@@ -132,7 +137,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   const [currentTime, setCurrentTime] = useState('');
 
   // Action Confirmation States
-  const [confirmAction, setConfirmAction] = useState<'delete' | 'reject' | 'deactivate' | 'activate' | 'approve' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'reject' | 'deactivate' | 'activate' | 'approve' | 'revert' | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -153,11 +158,15 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       } else if (confirmAction === 'approve') {
         await api.patch(`/api/donors/approve/${targetId}`);
         setSelectedApplicant(null);
+      } else if (confirmAction === 'revert') {
+        await api.patch(`/api/donors/revert/${targetId}`);
+        setSelectedApplicant(null);
       } else if (confirmAction === 'deactivate' || confirmAction === 'activate') {
         await api.patch(`/api/donors/toggle-status/${targetId}`);
         setSelectedDonor(null);
       }
-      fetchAllDonors();
+      await fetchAllDonors();
+      showFeedback(`Successfully performed ${confirmAction} action.`, 'success');
       setConfirmAction(null);
     } catch (error: any) {
       console.error(`Failed to perform ${confirmAction} action:`, error);
@@ -381,57 +390,112 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     }
   ]);
 */
-// Main list states
+  // Main list states
   const [donors, setDonors] = useState<Donor[]>([]);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // --- PASTE THIS NEW BLOCK HERE ---
-  
-  // This function reaches out to your backend, grabs the raw database data, 
-  // and translates it so your frontend UI can read it perfectly without crashing.
- // This function reaches out to your backend, grabs the raw database data, 
-  // and translates it so your frontend UI can read it perfectly without crashing.
+  // Inline feedback toast (replaces alert())
+  const [actionFeedback, setActionFeedback] = useState<{ message: string | string[]; type: 'success' | 'error' } | null>(null);
+  const showFeedback = (message: string | string[], type: 'success' | 'error' = 'success') => {
+    setActionFeedback({ message, type });
+    const duration = type === 'error' && Array.isArray(message) ? 6000 : 3500;
+    setTimeout(() => setActionFeedback(null), duration);
+  };
+
+  const parseValidationErrors = (msg: string): string[] | string => {
+    if (!msg) return "";
+
+    // Check if it's a validation error list
+    if (msg.includes("Invalid request data:") || msg.includes("request data:")) {
+      let cleanMsg = msg.replace(/^Invalid request data:\s*/, "").replace(/^request data:\s*/, "");
+
+      const parts = cleanMsg.split(/,\s*(?=[a-z_]+:)/);
+      const formattedErrors: string[] = [];
+
+      const fieldMap: Record<string, string> = {
+        name: "Name",
+        email: "Email Address",
+        phone: "Phone Number",
+        birth_date: "Date of Birth",
+        occupation: "Occupation",
+        marital_status: "Marital Status",
+        home_address: "Home Address",
+        travelled_recently: "Recent Travel",
+        country_visited: "Countries Visited",
+        purpose: "Purpose of Travel",
+        reason: "Donation Reason",
+        spouse_consent: "Spouse Consent",
+        previously_donated: "Previously Donated",
+        last_donation: "Last Donation Date",
+        place_donated: "Last Donation Place",
+        reason_for_stopping: "Reason for Stopping"
+      };
+
+      for (const part of parts) {
+        const colonIdx = part.indexOf(":");
+        if (colonIdx !== -1) {
+          const field = part.substring(0, colonIdx).trim();
+          let errorText = part.substring(colonIdx + 1).trim();
+
+          const friendlyField = fieldMap[field] || field;
+
+          if (errorText.toLowerCase().includes("invalid email")) {
+            errorText = "Please enter a valid email address.";
+          } else if (errorText.toLowerCase().includes("invalid phone")) {
+            errorText = "Please enter a valid phone number.";
+          } else if (errorText.toLowerCase().includes("must be at least 2 characters")) {
+            errorText = "Must be at least 2 characters long.";
+          }
+
+          formattedErrors.push(`${friendlyField}: ${errorText}`);
+        } else {
+          formattedErrors.push(part.trim());
+        }
+      }
+
+      return formattedErrors.length > 0 ? formattedErrors : msg;
+    }
+
+    return msg;
+  };
+
   const fetchAllDonors = async () => {
+    setIsLoadingData(true);
     try {
-      setIsLoadingData(true);
       const response = await api.get('/api/donors');
-      
-      // 1. THE HEAT-SEEKING MISSILE
-      // This logic digs into the backend response and finds the actual Array
       let rawArray: any[] = [];
-      const payload = response.data?.data; // This is the { ... } object from your screenshot
+      const payload = response.data?.data;
 
       if (Array.isArray(payload)) {
         rawArray = payload;
       } else if (payload && typeof payload === 'object') {
-        // Look through all the keys in the object to find the one holding the array (like 'donors' or 'results')
-        const arrayKey = Object.keys(payload).find(key => Array.isArray(payload[key]));
-        if (arrayKey) {
-          rawArray = payload[arrayKey];
+        if (Array.isArray(payload.data)) {
+          rawArray = payload.data;
+        } else {
+          const arrayKey = Object.keys(payload).find(key => Array.isArray(payload[key]));
+          if (arrayKey) rawArray = payload[arrayKey];
         }
       }
-
-      // If the database is completely empty, rawArray will just be [], which is safe!
-      if (!rawArray) {
-        rawArray = []; 
-      }
-
-     
-        
-      // 2. THE TRANSLATOR
       const mappedData = rawArray.map((d: any) => {
         const profile = d.profile || {};
         const personal = profile.personal_information || {};
         const travelInfo = profile.traveling_information || {};
         const donationInfo = profile.donation_information || {};
         const medicalInfo = profile.medical_information || {};
-        
-        // This is a "base" object containing everything common to both
-        const base = {
-          id: d.dtn,
+        return {
+          id: d.dtn.toString(),
           name: d.name,
-          dob: d.birth_date ? new Date(d.birth_date).toISOString().split('T')[0] : 'N/A',
+          status: d.application_status === 'approved'
+            ? (d.account_status === 'active' ? 'Active' : 'Inactive')
+            : (d.application_status === 'pending' ? 'Pending' : 'Rejected'),
+          application_status: d.application_status.charAt(0).toUpperCase() + d.application_status.slice(1),
+          dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
+          dateApplied: d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : 'N/A',
+          dob: d.birth_date ? d.birth_date.split('T')[0] : 'N/A',
+          lastDonation: d.last_system_donation
+            ? new Date(d.last_system_donation).toISOString().split('T')[0]
+            : (donationInfo.last_donation || 'N/A'),
           occupation: personal.occupation || '',
           maritalStatus: personal.marital_status || '',
           address: personal.home_address || '',
@@ -443,9 +507,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           donationReasons: donationInfo.reason || '',
           spouseSupport: donationInfo.spouse_consent === 'yes' ? 'Yes' : 'No',
           prevDonations: donationInfo.previously_donated === 'yes' ? 'Yes' : 'No',
-          lastDonationDate: donationInfo.last_donation || '',
-          lastDonationLocation: donationInfo.place_donated || '',
+          lastDonationDate: d.last_system_donation
+            ? new Date(d.last_system_donation).toISOString().split('T')[0]
+            : (donationInfo.last_donation || ''),
+          lastDonationLocation: d.last_system_donation ? 'System Recorded Collection' : (donationInfo.place_donated || ''),
           stoppedReason: donationInfo.reason_for_stopping || '',
+
           medicalHistory: {
             tuberculosis: medicalInfo.infectious_medical_illness?.tuberculosis === 'yes' ? 'Yes' : 'No',
             hepatitisB: medicalInfo.infectious_medical_illness?.hepatitis_b === 'yes' ? 'Yes' : 'No',
@@ -471,38 +538,32 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             repeatedTransfusions: medicalInfo.blood_exposure_transfusion?.repeated_blood_transfusion === 'yes' ? 'Yes' : 'No',
           }
         };
-
-        return {
-          ...base,
-          // Add fields specifically for the Donor interface
-          status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Active' : 'Inactive'),
-          dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
-          lastDonation: donationInfo.last_donation || 'N/A',
-          // Add fields specifically for the Applicant interface
-          application_status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Approved' : 'Rejected'),
-          dateApplied: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A'
-        };
       });
 
-      setDonors(mappedData.filter((d: any) => d.application_status === 'Approved') as Donor[]);
-      setApplicants(mappedData.filter((d: any) => d.application_status === 'Pending' || d.application_status === 'Rejected') as Applicant[]);
+      const fetchedApplicants = mappedData.filter((d: any) => 
+        d.application_status === 'Pending' || d.application_status === 'Rejected' || d.application_status === 'Approved'
+      ) as Applicant[];
+      const fetchedDonors = mappedData.filter((d: any) =>
+        d.application_status === 'Approved'
+      ) as Donor[];
+
+      setApplicants(fetchedApplicants);
+      setDonors(fetchedDonors);
 
     } catch (error) {
       console.error("Failed to fetch donors:", error);
+      showFeedback("Failed to load records from the server.", "error");
     } finally {
       setIsLoadingData(false);
     }
   };
-  // 8. This built-in React hook tells the component: 
-  // "Hey, as soon as this page loads for the first time, run the fetchAllDonors function automatically!"
-  useEffect(() => {
-    fetchAllDonors();
-  }, []);
+
   // --- END OF PASTE ---
 
   // Query Filter States
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(mode === 'applicants' ? 'Pending' : 'All');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
@@ -555,6 +616,17 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     repeatedTransfusions: 'No' as 'Yes' | 'No',
   });
 
+  // 8. This built-in React hook tells the component: 
+  // "Hey, as soon as this page loads for the first time, run the fetchAllDonors function automatically!"
+  useEffect(() => {
+    fetchAllDonors();
+  }, [mode]);
+
+  // Reset status filter when switching mode
+  useEffect(() => {
+    setStatusFilter(mode === 'applicants' ? 'Pending' : 'All');
+  }, [mode]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSidebarNotification(false);
@@ -583,87 +655,61 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     return () => clearInterval(interval);
   }, []);
 
-  // Filter & Sort Logic
-  const getProcessedDonors = () => {
-    let result = [...donors];
+  // Filter & Sort Logic (Unified)
+  const getProcessedItems = () => {
+    let result: (Donor | Applicant)[] = mode === 'donors' ? [...donors] : [...applicants];
 
-    // Search filter (id or name)
+    // Local Search
     if (search.trim() !== '') {
-      result = result.filter(
-        (d) =>
-          d.name.toLowerCase().includes(search.toLowerCase()) ||
-          d.id.toLowerCase().includes(search.toLowerCase())
+      result = result.filter((d) =>
+        d.name.toLowerCase().includes(search.toLowerCase()) ||
+        d.id.toLowerCase().includes(search.toLowerCase())
       );
     }
 
-    // Status filter
-    if (statusFilter !== 'All') {
-      result = result.filter((d) => d.status === statusFilter);
+    // Local Status Filter
+    if (mode === 'applicants') {
+      if (statusFilter !== 'All') {
+        result = result.filter((d) => 
+          (d as Applicant).application_status.toLowerCase() === statusFilter.toLowerCase()
+        );
+      }
+    } else {
+      if (statusFilter !== 'All') {
+        result = result.filter((d) => 
+          d.status.toLowerCase() === statusFilter.toLowerCase()
+        );
+      }
     }
 
-    // Sorting
-    result.sort((a, b) => {
-      let aVal = a[sortBy as keyof Donor];
-      let bVal = b[sortBy as keyof Donor];
+    // Local Sorting
+    result.sort((a: any, b: any) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
 
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal as string).toLowerCase();
+      // Handle specific column mapping if needed
+      if (sortBy === 'status' && mode === 'donors') {
+        valA = a.status;
+        valB = b.status;
+      } else if (sortBy === 'application_status' && mode === 'applicants') {
+        valA = a.application_status;
+        valB = b.application_status;
       }
 
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
 
     return result;
   };
 
-  const getProcessedApplicants = () => {
-    let result = [...applicants];
-
-    // Search filter
-    if (search.trim() !== '') {
-      result = result.filter(
-        (a) =>
-          a.name.toLowerCase().includes(search.toLowerCase()) ||
-          a.id.toLowerCase().includes(search.toLowerCase()) ||
-          a.email.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    // Application Status filter
-    if (statusFilter !== 'All') {
-      result = result.filter((a) => a.application_status === statusFilter);
-    }
-
-    // Sorting
-    result.sort((a, b) => {
-      let aVal = a[sortBy as keyof Applicant];
-      let bVal = b[sortBy as keyof Applicant];
-
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = (bVal as string).toLowerCase();
-      }
-
-      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  };
-
-  const processedDonors = getProcessedDonors();
-  const processedApplicants = getProcessedApplicants();
+  const processedItems = getProcessedItems();
 
   // Pagination bounds
-  const totalItems = mode === 'donors' ? processedDonors.length : processedApplicants.length;
+  const totalItems = processedItems.length;
   const totalPages = Math.ceil(totalItems / limit) || 1;
-  const pagedItems = mode === 'donors' 
-    ? processedDonors.slice((page - 1) * limit, page * limit)
-    : processedApplicants.slice((page - 1) * limit, page * limit);
+  const pagedItems = processedItems.slice((page - 1) * limit, page * limit);
 
   // Reset page when filter changes
   useEffect(() => {
@@ -682,12 +728,15 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     try {
       const donorPayload = {
         name: newDonorForm.name,
         email: newDonorForm.email,
-        phone: newDonorForm.phone,
+        phone: newDonorForm.phone.startsWith('+')
+          ? newDonorForm.phone
+          : newDonorForm.phone.startsWith('0')
+            ? `+63${newDonorForm.phone.slice(1)}`
+            : `+63${newDonorForm.phone}`,
         birth_date: newDonorForm.dob,
         profile: {
           personal_information: {
@@ -749,11 +798,9 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           headers: { 'Content-Type': 'application/json' },
         });
       } else {
-        // POST request: Backend needs FormData for the image-upload middleware
-        const formData = new FormData();
-        formData.append("json", JSON.stringify(donorPayload));
-        await api.post('/api/donors/register', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        // POST request: Send as JSON (same as PUT)
+        await api.post('/api/donors/register', donorPayload, {
+          headers: { 'Content-Type': 'application/json' },
         });
       }
 
@@ -762,10 +809,11 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       setIsEditMode(false);
       setEditTargetId(null);
       fetchAllDonors();
-      alert("Success!");
-    } catch (error) {
+      showFeedback(isEditMode ? "Donor details updated successfully!" : "Donor registered successfully!", 'success');
+    } catch (error: any) {
       console.error("Operation failed:", error);
-      alert("Action failed. Check console for details.");
+      const serverMsg = error.response?.data?.message || "";
+      showFeedback(parseValidationErrors(serverMsg) || (isEditMode ? "Failed to update donor." : "Failed to register donor."), 'error');
     }
   };
 
@@ -787,13 +835,42 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
-      
+      {/* Toast Notification */}
+      {actionFeedback && (
+        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${actionFeedback.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
+            : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
+          }`}>
+          <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+            {actionFeedback.type === 'success' ? (
+              <Check className="size-4 text-emerald-600" />
+            ) : (
+              <X className="size-4 text-rose-600" />
+            )}
+          </div>
+          <div className="flex-1 text-xs sm:text-sm font-semibold min-w-0">
+            {Array.isArray(actionFeedback.message) ? (
+              <div className="space-y-1">
+                <p className="font-bold text-rose-900">Please correct the following fields:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-rose-700 font-medium">
+                  {actionFeedback.message.map((msg, index) => (
+                    <li key={index} className="break-words">{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <span className="break-words">{actionFeedback.message}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Sidebar Navigation */}
       <StaffSidebar activeItem={mode === 'donors' ? 'donors' : 'applicants-donors'} />
 
       {/* Main Workspace */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
-        
+
         {/* Header */}
         <header className="px-8 py-6 bg-white border-b border-neutral-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4 shrink-0">
           <div>
@@ -811,7 +888,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
         {/* Workspace Body */}
         <main className="p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
-          
+
           {/* Action and Filter Row */}
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
             <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
@@ -829,28 +906,46 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               </div>
 
               {/* Status Filter */}
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="size-4 text-neutral-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-3.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className="flex items-center justify-between gap-2 min-w-[10rem] px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-600 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
                   data-testid="status-select"
                 >
-                  <option value="All">All Statuses</option>
-                  {mode === 'donors' ? (
-                    <>
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </>
-                  ) : (
-                    <>
-                      <option value="Approved">Approved</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Rejected">Rejected</option>
-                    </>
-                  )}
-                </select>
+                  <span className="flex items-center gap-2">
+                    <SlidersHorizontal className="size-3.5 text-neutral-400" />
+                    {statusFilter === 'All' ? 'All Statuses' : statusFilter}
+                  </span>
+                  <ChevronDown className={`size-3.5 text-neutral-400 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isStatusDropdownOpen && (
+                  <div className="absolute z-20 w-full mt-1.5 bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                    <ul className="py-1">
+                      {(mode === 'donors'
+                        ? ['All', 'Active', 'Inactive']
+                        : ['All', 'Approved', 'Pending', 'Rejected']
+                      ).map((status) => (
+                        <li key={status}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStatusFilter(status);
+                              setIsStatusDropdownOpen(false);
+                            }}
+                            className={`block w-full text-left px-4 py-2 text-xs font-bold transition-colors ${statusFilter === status
+                                ? 'bg-brand-teal/10 text-brand-teal'
+                                : 'text-neutral-600 hover:bg-slate-50'
+                              }`}
+                          >
+                            {status === 'All' ? 'All Statuses' : status}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {/* Limit Selector */}
@@ -871,14 +966,14 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             {/* New Donor button (mainly on donors list or both) */}
             {mode === 'applicants' && (
               <button
-                  onClick={() => {
-                    setIsEditMode(false);
-                    setEditTargetId(null);
-                    setIsRegisterOpen(true);
-                  }}
-                  className="px-5 py-2.5 text-sm font-bold text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap"
-                  data-testid="new-donor-btn"
-                >
+                onClick={() => {
+                  setIsEditMode(false);
+                  setEditTargetId(null);
+                  setIsRegisterOpen(true);
+                }}
+                className="px-5 py-2.5 text-sm font-bold text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap"
+                data-testid="new-donor-btn"
+              >
                 <Plus className="size-4" />
                 New Donor
               </button>
@@ -932,7 +1027,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
                   {isLoadingData ? (
-                    [...Array(5)].map((_, index) => (
+                    [...Array(limit)].map((_, index) => (
                       <tr key={`skeleton-${index}`} className="animate-pulse border-b border-neutral-100 pointer-events-none">
                         <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-10"></div></td>
                         <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-32"></div></td>
@@ -992,6 +1087,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   >
                     <ChevronLeft className="size-4" />
                   </button>
+
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
@@ -1012,13 +1108,13 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       {(selectedDonor || selectedApplicant) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="detail-modal">
           <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200 flex flex-col">
-            
+
             {/* Modal Sticky Header */}
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
                 <User className="size-5.5 text-brand-teal" />
                 <h3 className="text-lg font-bold text-neutral-900">
-                  {mode === 'donors' ? 'Donor Profile' : 'Applicant Profile'}
+                  {isEditMode ? 'Edit Donor Profile' : 'New Donor Registration'}
                 </h3>
               </div>
               <button
@@ -1033,7 +1129,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
             {/* Modal Body Columns */}
             <div className="p-8 flex flex-col md:flex-row gap-8 overflow-y-auto">
-              
+
               {/* Left Column: Side Profile */}
               <div className="w-full md:w-72 shrink-0 space-y-6">
                 <div className="bg-white border border-neutral-200 rounded-3xl p-6 flex flex-col items-center gap-5 text-center shadow-sm">
@@ -1041,7 +1137,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   <div className="size-36 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
                     {(selectedDonor || selectedApplicant)?.name.split(' ').map((n) => n[0]).join('')}
                   </div>
-                  
+
                   {/* Minimal metadata info */}
                   <div className="space-y-1.5 w-full">
                     <h4 className="font-bold text-neutral-950 text-base" data-testid="modal-profile-name">
@@ -1052,8 +1148,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     </p>
                     <div className="pt-2">
                       <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(
-                        mode === 'donors' 
-                          ? (selectedDonor as Donor)?.status 
+                        mode === 'donors'
+                          ? (selectedDonor as Donor)?.status
                           : (selectedApplicant as Applicant)?.application_status
                       )}`} data-testid="modal-profile-status">
                         {mode === 'donors' ? (selectedDonor as Donor)?.status : (selectedApplicant as Applicant)?.application_status}
@@ -1062,7 +1158,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </div>
 
                   <hr className="w-full border-neutral-100" />
-                  
+
                   <div className="w-full text-left space-y-2 text-xs">
                     <p className="text-neutral-500 font-bold font-sans uppercase text-[9px] tracking-widest">Profile Stats</p>
                     <p className="flex justify-between">
@@ -1082,34 +1178,101 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
                 {/* Profile actions */}
                 <div className="space-y-3.5">
-                  
-                  {/* BUTTON 1: TOGGLE STATUS OR APPROVE */}
-                  <button 
-                    onClick={() => {
-                      const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
-                      if (!targetId) return;
-                      setActionError('');
-                      if (mode === 'donors') {
-                        setConfirmAction(selectedDonor?.status === 'Active' ? 'deactivate' : 'activate');
-                      } else {
-                        setConfirmAction('approve');
-                      }
-                    }}
-                    className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
-                  >
-                    {mode === 'donors' 
-                      ? ((selectedDonor?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
-                      : 'Approve Application'
-                    }
-                  </button>
+                  {/* BUTTON 1: TOGGLE STATUS OR APPROVE/REVERT/REJECT */}
+                  {mode === 'donors' ? (
+                    <button
+                      onClick={() => {
+                        const targetId = selectedDonor?.id;
+                        if (!targetId) return;
+                        setActionError('');
+                        setConfirmAction(selectedDonor.status === 'Active' ? 'deactivate' : 'activate');
+                      }}
+                      className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                      data-testid="toggle-profile-status-btn"
+                    >
+                      {selectedDonor?.status === 'Active' ? 'Deactivate Profile' : 'Activate Profile'}
+                    </button>
+                  ) : (
+                    <>
+                      {selectedApplicant?.application_status === 'Rejected' ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('approve');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="approve-profile-btn"
+                          >
+                            Approve Profile
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('revert');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="revert-profile-btn"
+                          >
+                            Revert to Pending
+                          </button>
+                        </>
+                      ) : selectedApplicant?.application_status === 'Approved' ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('revert');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="revert-profile-btn"
+                          >
+                            Revert to Pending
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('reject');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="reject-profile-btn"
+                          >
+                            Reject Application
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('approve');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="approve-profile-btn"
+                          >
+                            Approve Application
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActionError('');
+                              setConfirmAction('reject');
+                            }}
+                            className="w-full py-3 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                            data-testid="reject-profile-btn"
+                          >
+                            Reject Application
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
 
-                  {/* NEW BUTTON: EDIT PROFILE */}
-                  <button 
+                  {/* EDIT PROFILE */}
+                  <button
                     onClick={() => {
                       const target = mode === 'donors' ? selectedDonor : selectedApplicant;
                       if (!target) return;
 
-                      // Pre-fill the registration form with this person's existing data
                       setNewDonorForm({
                         name: target.name, dob: target.dob, occupation: target.occupation,
                         maritalStatus: target.maritalStatus, address: target.address,
@@ -1128,42 +1291,28 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                         needlePrick: target.bloodExposure.needlePrick, repeatedTransfusions: target.bloodExposure.repeatedTransfusions,
                       });
 
-                      // Trigger Edit Mode and open the modal
                       setIsEditMode(true);
                       setEditTargetId(target.id);
                       setSelectedDonor(null);
                       setSelectedApplicant(null);
                       setIsRegisterOpen(true);
                     }}
-                    className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-3 text-xs font-bold text-brand-teal hover:text-white bg-white hover:bg-brand-teal border border-brand-teal/30 hover:border-brand-teal rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                    data-testid="edit-profile-btn"
                   >
                     Edit Profile
                   </button>
 
-                  {/* BUTTON 2: REJECT APPLICANT */}
-                  {mode === 'applicants' && (
-                    <button 
-                      onClick={() => {
-                        const targetId = selectedApplicant?.id;
-                        if (!targetId) return;
-                        setActionError('');
-                        setConfirmAction('reject');
-                      }}
-                      className="w-full py-3 text-xs font-bold text-rose-600 hover:text-rose-700 bg-white border border-neutral-200 hover:border-rose-200 hover:bg-rose-50/50 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
-                    >
-                      Reject Application
-                    </button>
-                  )}
-
-                  {/* BUTTON 3: PERMANENTLY DELETE */}
-                  <button 
+                  {/* DELETE PROFILE */}
+                  <button
                     onClick={() => {
                       const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
                       if (!targetId) return;
                       setActionError('');
                       setConfirmAction('delete');
                     }}
-                    className="w-full py-3 text-xs font-bold text-rose-600 hover:text-rose-700 bg-white border border-neutral-200 hover:border-rose-200 hover:bg-rose-50/50 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                    className="w-full py-3 text-xs font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-neutral-200 hover:border-rose-600 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                    data-testid="delete-profile-btn"
                   >
                     Delete Profile
                   </button>
@@ -1175,7 +1324,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
               {/* Right Column: Main Collapsible Cards */}
               <div className="flex-1 space-y-6">
-                
+
                 {/* 1. Personal Information */}
                 <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm" data-testid="profile-section-personal">
                   <h4 className="text-sm font-bold text-neutral-900 border-b border-neutral-100 pb-2 uppercase tracking-wide">
@@ -1285,7 +1434,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   <h4 className="text-sm font-bold text-neutral-900 border-b border-neutral-100 pb-2 uppercase tracking-wide">
                     Medical Checklists & Screening
                   </h4>
-                  
+
                   <div className="space-y-6">
                     {/* table 1: Illnesses */}
                     <div className="border border-neutral-100 rounded-xl overflow-hidden shadow-sm">
@@ -1421,12 +1570,12 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       {/* REGISTRATION MODAL (New Donor Tabbed Form) */}
       {isRegisterOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 overflow-y-auto" data-testid="register-modal">
-          <form 
-            onSubmit={handleRegisterSubmit} 
+          <form
+            onSubmit={handleRegisterSubmit}
             data-testid="register-form"
             className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200 flex flex-col"
           >
-            
+
             {/* Modal Header */}
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
@@ -1455,11 +1604,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   key={item.tab}
                   type="button"
                   onClick={() => setRegisterTab(item.tab)}
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                    registerTab === item.tab
-                      ? 'bg-brand-teal text-white shadow-sm'
-                      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
-                  }`}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${registerTab === item.tab
+                    ? 'bg-brand-teal text-white shadow-sm'
+                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+                    }`}
                   data-testid={`register-tab-${item.tab}`}
                 >
                   {item.label}
@@ -1469,11 +1617,11 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
             {/* Modal Form Body */}
             <div className="p-8 flex-1 overflow-y-auto space-y-6">
-              
+
               {/* TAB 1: Personal & Contact */}
               {registerTab === 1 && (
                 <div className="space-y-6" data-testid="register-pane-1">
-                  
+
                   {/* Personal details fields */}
                   <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm">
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
@@ -1584,7 +1732,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               {/* TAB 2: Travel & Donation */}
               {registerTab === 2 && (
                 <div className="space-y-6" data-testid="register-pane-2">
-                  
+
                   {/* Travel details fields */}
                   <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-4 shadow-sm">
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
@@ -1608,7 +1756,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                           ))}
                         </div>
                       </div>
-                      
+
                       {newDonorForm.travel === 'Yes' && (
                         <>
                           <div className="space-y-1.5">
@@ -1735,7 +1883,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               {/* TAB 3: Medical History & Habits */}
               {registerTab === 3 && (
                 <div className="space-y-6" data-testid="register-pane-3">
-                  
+
                   {/* Medical Checklists Form */}
                   <div className="bg-white border border-neutral-200 rounded-2xl p-6 space-y-5 shadow-sm text-xs font-bold">
                     <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-widest border-b border-neutral-50 pb-2">
@@ -1897,7 +2045,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </button>
                 )}
               </div>
-              
+
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -1906,7 +2054,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 >
                   Cancel
                 </button>
-                
+
                 {registerTab < 3 ? (
                   <button
                     type="button"
@@ -1958,15 +2106,17 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
             <div className="p-6 space-y-4">
               <p className="text-sm text-neutral-600 leading-relaxed">
-                {confirmAction === 'delete' 
+                {confirmAction === 'delete'
                   ? `Are you sure you want to permanently delete profile ${(selectedDonor || selectedApplicant)?.name}? This action cannot be undone and will erase it from the database.`
                   : confirmAction === 'deactivate'
-                  ? `Are you sure you want to deactivate donor ${selectedDonor?.name}? They will no longer be able to donate until reactivated.`
-                  : confirmAction === 'reject'
-                  ? `Are you sure you want to reject application from ${selectedApplicant?.name}?`
-                  : confirmAction === 'approve'
-                  ? `Are you sure you want to approve application from ${selectedApplicant?.name}?`
-                  : `Are you sure you want to activate donor ${selectedDonor?.name}?`}
+                    ? `Are you sure you want to deactivate donor ${selectedDonor?.name}? They will no longer be able to donate until reactivated.`
+                    : confirmAction === 'reject'
+                      ? `Are you sure you want to reject application from ${selectedApplicant?.name}?`
+                      : confirmAction === 'approve'
+                        ? `Are you sure you want to approve application from ${selectedApplicant?.name}?`
+                        : confirmAction === 'revert'
+                          ? `Are you sure you want to revert application from ${(selectedDonor || selectedApplicant)?.name} to pending?`
+                          : `Are you sure you want to activate donor ${selectedDonor?.name}?`}
               </p>
 
               {actionError && (
@@ -1986,11 +2136,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                 <button
                   onClick={executeConfirmAction}
                   disabled={isActionLoading}
-                  className={`flex-1 h-11 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
-                    confirmAction === 'delete' || confirmAction === 'deactivate' || confirmAction === 'reject' 
-                      ? 'bg-red-500 hover:bg-red-600' 
+                  className={`flex-1 h-11 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${confirmAction === 'delete' || confirmAction === 'deactivate' || confirmAction === 'reject'
+                      ? 'bg-red-500 hover:bg-red-600'
                       : 'bg-brand-teal hover:bg-brand-teal-darker'
-                  }`}
+                    }`}
                 >
                   {isActionLoading ? (
                     <>
