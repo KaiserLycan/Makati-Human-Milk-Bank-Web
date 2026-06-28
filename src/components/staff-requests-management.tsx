@@ -424,8 +424,9 @@ export default function StaffRequestsManagement() {
                   min={1}
                   max={100}
                   value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value) || 1)}
+                  onChange={(e) => setLimit(Math.min(Number(e.target.value) || 1, 100))}
                   className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
+                  data-testid="limit-select"
                 />
               </div>
             </div>
@@ -497,8 +498,8 @@ export default function StaffRequestsManagement() {
 
                   {!isLoading && requests.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-neutral-400">
-                        No requests found matching current criteria.
+                      <td colSpan={6} className="text-center py-16 text-neutral-400 font-medium font-sans">
+                        No records match the active search and filter settings.
                       </td>
                     </tr>
                   )}
@@ -506,12 +507,29 @@ export default function StaffRequestsManagement() {
               </table>
             </div>
 
+            {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
-                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries</span>
-                <div className="flex gap-2">
-                  <button disabled={page === 1} onClick={() => setPage(page - 1)} className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="size-4" /></button>
-                  <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight className="size-4" /></button>
+              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500 font-sans">
+                <span>
+                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage(page - 1)}
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="prev-page-btn"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button
+                    disabled={page === totalPages}
+                    onClick={() => setPage(page + 1)}
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="next-page-btn"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
                 </div>
               </div>
             )}
@@ -668,7 +686,7 @@ export default function StaffRequestsManagement() {
                 <input
                   type="text"
                   disabled
-                  value={`REQ-${editRequestForm.rid}`}
+                  value={editRequestForm.rid}
                   className="w-full border border-neutral-200 bg-neutral-100 rounded-xl px-4 py-2.5 text-neutral-500 text-sm cursor-not-allowed"
                 />
               </div>
@@ -805,7 +823,7 @@ export default function StaffRequestsManagement() {
                           {selectedRequest.request_bottles && selectedRequest.request_bottles.length > 0 ? (
                             selectedRequest.request_bottles.map((bottle, idx) => (
                               <tr key={idx} className="hover:bg-slate-100/50 transition-colors">
-                                <td className="px-4 py-3.5 font-bold text-neutral-900">BTL-{bottle.pasteurized_milk.btl_id}</td>
+                                <td className="px-4 py-3.5 font-bold text-neutral-900">{bottle.pasteurized_milk.btl_id}</td>
                                 <td className="px-4 py-3.5 text-right text-neutral-800">{bottle.pasteurized_milk.volume_ml} mL</td>
                               </tr>
                             ))
@@ -825,10 +843,10 @@ export default function StaffRequestsManagement() {
             </div>
 
             {/* Modal Footer (Mirrored from Pool Management) */}
-            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50 shrink-0">
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50 shrink-0 items-center">
               <button
                 onClick={() => setConfirmAction('delete')}
-                className="px-6 py-3 text-red-600 hover:bg-red-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 text-red-655 hover:text-red-755 font-bold text-sm rounded-xl hover:bg-red-50/50 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="size-4" /> Delete
               </button>
@@ -836,7 +854,7 @@ export default function StaffRequestsManagement() {
               {selectedRequest.request_status === 'waiting' && (
                 <button
                   onClick={openEditFormFromModal}
-                  className="px-6 py-3 text-brand-teal hover:bg-brand-teal/10 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                  className="px-4 py-2.5 text-brand-teal hover:text-brand-teal-darker font-bold text-sm rounded-xl hover:bg-brand-teal/5 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Edit2 className="size-4" /> Edit
                 </button>
@@ -845,7 +863,7 @@ export default function StaffRequestsManagement() {
               {['waiting', 'allocated'].includes(selectedRequest.request_status?.toLowerCase()) && (
                 <button
                   onClick={() => setConfirmAction('cancel')}
-                  className="px-6 py-3 text-amber-600 hover:bg-amber-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                  className="px-4 py-2.5 text-amber-655 hover:text-amber-755 font-bold text-sm rounded-xl hover:bg-amber-50/50 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <XCircle className="size-4" /> Cancel
                 </button>
@@ -854,7 +872,7 @@ export default function StaffRequestsManagement() {
               {['waiting', 'allocated'].includes(selectedRequest.request_status?.toLowerCase()) && (
                 <button
                   onClick={() => setConfirmAction('dispense')}
-                  className="px-6 py-3 text-white bg-brand-teal hover:bg-brand-teal/90 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-brand-teal/20"
+                  className="px-6 py-2.5 text-white bg-brand-teal hover:bg-brand-teal/90 font-bold text-sm rounded-xl transition-all flex items-center gap-2 shadow-sm cursor-pointer"
                 >
                   <CheckCircle2 className="size-4" /> Dispense
                 </button>
@@ -862,7 +880,7 @@ export default function StaffRequestsManagement() {
 
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-xl transition-colors ml-2 shadow-lg shadow-neutral-900/20"
+                className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-855 text-white font-bold text-sm rounded-xl ml-2 shadow-sm transition-all cursor-pointer"
               >
                 Done
               </button>

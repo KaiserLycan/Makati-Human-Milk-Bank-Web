@@ -333,9 +333,9 @@ export default function StaffInventoryManagement() {
                   min={1}
                   max={100}
                   value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value) || 1)}
+                  onChange={(e) => setLimit(Math.min(Number(e.target.value) || 1, 100))}
                   className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
-                  data-testid="limit-input"
+                  data-testid="limit-select"
                 />
               </div>
             </div>
@@ -410,8 +410,8 @@ export default function StaffInventoryManagement() {
 
                   {!isLoading && inventory.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-12 text-neutral-400">
-                        No items found matching current criteria.
+                      <td colSpan={7} className="text-center py-16 text-neutral-400 font-medium font-sans">
+                        No records match the active search and filter settings.
                       </td>
                     </tr>
                   )}
@@ -421,11 +421,27 @@ export default function StaffInventoryManagement() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
-                <span>Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries</span>
-                <div className="flex gap-2">
-                  <button disabled={page === 1} onClick={() => setPage(page - 1)} className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="size-4" /></button>
-                  <button disabled={page === totalPages} onClick={() => setPage(page + 1)} className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><ChevronRight className="size-4" /></button>
+              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500 font-sans">
+                <span>
+                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={page === 1}
+                    onClick={() => setPage(page - 1)}
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="prev-page-btn"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button
+                    disabled={page === totalPages}
+                    onClick={() => setPage(page + 1)}
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="next-page-btn"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
                 </div>
               </div>
             )}
@@ -594,10 +610,10 @@ export default function StaffInventoryManagement() {
               </div>
             </div>
             
-            <div className="bg-slate-50 px-6 py-4 flex justify-end border-t border-neutral-100 rounded-b-3xl">
+            <div className="p-6 border-t border-neutral-100 flex justify-end bg-slate-50/50 rounded-b-3xl items-center">
               <button 
                 onClick={() => setSelectedItem(null)}
-                className="bg-white border border-neutral-200 text-neutral-700 px-6 py-2 rounded-xl font-bold hover:bg-neutral-50 transition-colors shadow-sm"
+                className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-850 text-white font-bold text-sm rounded-xl shadow-sm transition-all cursor-pointer"
               >
                 Done
               </button>

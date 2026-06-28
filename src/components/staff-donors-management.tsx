@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { api } from '../utils/api';
 import {
   Bell,
   Plus,
@@ -20,6 +21,8 @@ import {
   ChevronRight,
   Calendar,
   Lock,
+  Trash2,
+  CheckCircle2,
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
@@ -128,7 +131,45 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   const [showSidebarNotification, setShowSidebarNotification] = useState(true);
   const [currentTime, setCurrentTime] = useState('');
 
+  // Action Confirmation States
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'reject' | 'deactivate' | 'activate' | 'approve' | null>(null);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  const executeConfirmAction = async () => {
+    const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
+    if (!targetId || !confirmAction) return;
+
+    setIsActionLoading(true);
+    setActionError('');
+    try {
+      if (confirmAction === 'delete') {
+        await api.delete(`/api/donors/${targetId}`);
+        setSelectedDonor(null);
+        setSelectedApplicant(null);
+      } else if (confirmAction === 'reject') {
+        await api.patch(`/api/donors/reject/${targetId}`);
+        setSelectedApplicant(null);
+      } else if (confirmAction === 'approve') {
+        await api.patch(`/api/donors/approve/${targetId}`);
+        setSelectedApplicant(null);
+      } else if (confirmAction === 'deactivate' || confirmAction === 'activate') {
+        await api.patch(`/api/donors/toggle-status/${targetId}`);
+        setSelectedDonor(null);
+      }
+      fetchAllDonors();
+      setConfirmAction(null);
+    } catch (error: any) {
+      console.error(`Failed to perform ${confirmAction} action:`, error);
+      setActionError(error.response?.data?.message || `Failed to perform ${confirmAction} action.`);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   // Main list states
+  // removing the mock 
+  /*
   const [donors, setDonors] = useState<Donor[]>([
     {
       id: 'D001',
@@ -339,6 +380,125 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       bloodExposure: { bloodProduct12m: 'No', needlePrick: 'No', repeatedTransfusions: 'No' }
     }
   ]);
+*/
+// Main list states
+  const [donors, setDonors] = useState<Donor[]>([]);
+  const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // --- PASTE THIS NEW BLOCK HERE ---
+  
+  // This function reaches out to your backend, grabs the raw database data, 
+  // and translates it so your frontend UI can read it perfectly without crashing.
+ // This function reaches out to your backend, grabs the raw database data, 
+  // and translates it so your frontend UI can read it perfectly without crashing.
+  const fetchAllDonors = async () => {
+    try {
+      setIsLoadingData(true);
+      const response = await api.get('/api/donors');
+      
+      // 1. THE HEAT-SEEKING MISSILE
+      // This logic digs into the backend response and finds the actual Array
+      let rawArray: any[] = [];
+      const payload = response.data?.data; // This is the { ... } object from your screenshot
+
+      if (Array.isArray(payload)) {
+        rawArray = payload;
+      } else if (payload && typeof payload === 'object') {
+        // Look through all the keys in the object to find the one holding the array (like 'donors' or 'results')
+        const arrayKey = Object.keys(payload).find(key => Array.isArray(payload[key]));
+        if (arrayKey) {
+          rawArray = payload[arrayKey];
+        }
+      }
+
+      // If the database is completely empty, rawArray will just be [], which is safe!
+      if (!rawArray) {
+        rawArray = []; 
+      }
+
+     
+        
+      // 2. THE TRANSLATOR
+      const mappedData = rawArray.map((d: any) => {
+        const profile = d.profile || {};
+        const personal = profile.personal_information || {};
+        const travelInfo = profile.traveling_information || {};
+        const donationInfo = profile.donation_information || {};
+        const medicalInfo = profile.medical_information || {};
+        
+        // This is a "base" object containing everything common to both
+        const base = {
+          id: d.dtn,
+          name: d.name,
+          dob: d.birth_date ? new Date(d.birth_date).toISOString().split('T')[0] : 'N/A',
+          occupation: personal.occupation || '',
+          maritalStatus: personal.marital_status || '',
+          address: personal.home_address || '',
+          phone: d.phone,
+          email: d.email,
+          travel: travelInfo.travelled_recently === 'yes' ? 'Yes' : 'No',
+          travelCountries: travelInfo.country_visited || '',
+          travelPurpose: travelInfo.purpose || '',
+          donationReasons: donationInfo.reason || '',
+          spouseSupport: donationInfo.spouse_consent === 'yes' ? 'Yes' : 'No',
+          prevDonations: donationInfo.previously_donated === 'yes' ? 'Yes' : 'No',
+          lastDonationDate: donationInfo.last_donation || '',
+          lastDonationLocation: donationInfo.place_donated || '',
+          stoppedReason: donationInfo.reason_for_stopping || '',
+          medicalHistory: {
+            tuberculosis: medicalInfo.infectious_medical_illness?.tuberculosis === 'yes' ? 'Yes' : 'No',
+            hepatitisB: medicalInfo.infectious_medical_illness?.hepatitis_b === 'yes' ? 'Yes' : 'No',
+            mastitis: medicalInfo.infectious_medical_illness?.mastitis === 'yes' ? 'Yes' : 'No',
+            syphilis: medicalInfo.infectious_medical_illness?.syphilis === 'yes' ? 'Yes' : 'No',
+            herpes: medicalInfo.infectious_medical_illness?.herpes === 'yes' ? 'Yes' : 'No',
+            std: medicalInfo.infectious_medical_illness?.std === 'yes' ? 'Yes' : 'No',
+          },
+          habits: {
+            alcohol24h: medicalInfo.substance_user_habits?.consumed_alcohol === 'yes' ? 'Yes' : 'No',
+            smoke: medicalInfo.substance_user_habits?.smoke === 'yes' ? 'Yes' : 'No',
+            illegalDrugs: medicalInfo.substance_user_habits?.illegal_drugs === 'yes' ? 'Yes' : 'No',
+            intravenousDrugs: medicalInfo.substance_user_habits?.intravenous_drug_use === 'yes' ? 'Yes' : 'No',
+          },
+          diet: {
+            vegetarian: medicalInfo.diet_supplement_tracking?.vegetarian === 'yes' ? 'Yes' : 'No',
+            multivitamins: medicalInfo.diet_supplement_tracking?.multivitamins === 'yes' ? 'Yes' : 'No',
+            herbalHighDose: medicalInfo.diet_supplement_tracking?.herbal_drugs === 'yes' ? 'Yes' : 'No',
+          },
+          bloodExposure: {
+            bloodProduct12m: medicalInfo.blood_exposure_transfusion?.received_blood === 'yes' ? 'Yes' : 'No',
+            needlePrick: medicalInfo.blood_exposure_transfusion?.needle_contact === 'yes' ? 'Yes' : 'No',
+            repeatedTransfusions: medicalInfo.blood_exposure_transfusion?.repeated_blood_transfusion === 'yes' ? 'Yes' : 'No',
+          }
+        };
+
+        return {
+          ...base,
+          // Add fields specifically for the Donor interface
+          status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Active' : 'Inactive'),
+          dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
+          lastDonation: donationInfo.last_donation || 'N/A',
+          // Add fields specifically for the Applicant interface
+          application_status: d.application_status === 'pending' ? 'Pending' : (d.account_status === 'active' ? 'Approved' : 'Rejected'),
+          dateApplied: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A'
+        };
+      });
+
+      setDonors(mappedData.filter((d: any) => d.application_status === 'Approved') as Donor[]);
+      setApplicants(mappedData.filter((d: any) => d.application_status === 'Pending' || d.application_status === 'Rejected') as Applicant[]);
+
+    } catch (error) {
+      console.error("Failed to fetch donors:", error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  };
+  // 8. This built-in React hook tells the component: 
+  // "Hey, as soon as this page loads for the first time, run the fetchAllDonors function automatically!"
+  useEffect(() => {
+    fetchAllDonors();
+  }, []);
+  // --- END OF PASTE ---
 
   // Query Filter States
   const [search, setSearch] = useState('');
@@ -355,6 +515,9 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   // Modal Visibility states
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [registerTab, setRegisterTab] = useState(1); // 1: Personal/Contact, 2: Travel/Donation, 3: Medical/Habits
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editTargetId, setEditTargetId] = useState<string | null>(null);
 
   // Register New Donor Form State
   const [newDonorForm, setNewDonorForm] = useState({
@@ -517,145 +680,93 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
     }
   };
 
-  // Submit registration form
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const newId = `D00${donors.length + 1}`;
-    const newDonor: Donor = {
-      id: newId,
-      name: newDonorForm.name,
-      status: 'Active',
-      dateJoined: new Date().toISOString().split('T')[0],
-      lastDonation: newDonorForm.lastDonationDate || 'N/A',
-      dob: newDonorForm.dob,
-      occupation: newDonorForm.occupation,
-      maritalStatus: newDonorForm.maritalStatus,
-      address: newDonorForm.address,
-      phone: newDonorForm.phone,
-      email: newDonorForm.email,
-      travel: newDonorForm.travel,
-      travelCountries: newDonorForm.travelCountries,
-      travelPurpose: newDonorForm.travelPurpose,
-      donationReasons: newDonorForm.donationReasons,
-      spouseSupport: newDonorForm.spouseSupport,
-      prevDonations: newDonorForm.prevDonations,
-      lastDonationDate: newDonorForm.lastDonationDate,
-      lastDonationLocation: newDonorForm.lastDonationLocation,
-      stoppedReason: newDonorForm.stoppedReason,
-      medicalHistory: {
-        tuberculosis: newDonorForm.tuberculosis,
-        hepatitisB: newDonorForm.hepatitisB,
-        mastitis: newDonorForm.mastitis,
-        syphilis: newDonorForm.syphilis,
-        herpes: newDonorForm.herpes,
-        std: newDonorForm.std,
-      },
-      habits: {
-        alcohol24h: newDonorForm.alcohol24h,
-        smoke: newDonorForm.smoke,
-        illegalDrugs: newDonorForm.illegalDrugs,
-        intravenousDrugs: newDonorForm.intravenousDrugs,
-      },
-      diet: {
-        vegetarian: newDonorForm.vegetarian,
-        multivitamins: newDonorForm.multivitamins,
-        herbalHighDose: newDonorForm.herbalHighDose,
-      },
-      bloodExposure: {
-        bloodProduct12m: newDonorForm.bloodProduct12m,
-        needlePrick: newDonorForm.needlePrick,
-        repeatedTransfusions: newDonorForm.repeatedTransfusions,
-      },
-    };
-
-    if (mode === 'applicants') {
-      const newApplicant: Applicant = {
-        id: `A00${applicants.length + 1}`,
+    try {
+      const donorPayload = {
         name: newDonorForm.name,
-        application_status: 'Pending',
-        dateApplied: new Date().toISOString().split('T')[0],
         email: newDonorForm.email,
-        dob: newDonorForm.dob,
-        occupation: newDonorForm.occupation,
-        maritalStatus: newDonorForm.maritalStatus,
-        address: newDonorForm.address,
         phone: newDonorForm.phone,
-        travel: newDonorForm.travel,
-        travelCountries: newDonorForm.travelCountries,
-        travelPurpose: newDonorForm.travelPurpose,
-        donationReasons: newDonorForm.donationReasons,
-        spouseSupport: newDonorForm.spouseSupport,
-        prevDonations: newDonorForm.prevDonations,
-        lastDonationDate: newDonorForm.lastDonationDate,
-        lastDonationLocation: newDonorForm.lastDonationLocation,
-        stoppedReason: newDonorForm.stoppedReason,
-        medicalHistory: {
-          tuberculosis: newDonorForm.tuberculosis,
-          hepatitisB: newDonorForm.hepatitisB,
-          mastitis: newDonorForm.mastitis,
-          syphilis: newDonorForm.syphilis,
-          herpes: newDonorForm.herpes,
-          std: newDonorForm.std,
-        },
-        habits: {
-          alcohol24h: newDonorForm.alcohol24h,
-          smoke: newDonorForm.smoke,
-          illegalDrugs: newDonorForm.illegalDrugs,
-          intravenousDrugs: newDonorForm.intravenousDrugs,
-        },
-        diet: {
-          vegetarian: newDonorForm.vegetarian,
-          multivitamins: newDonorForm.multivitamins,
-          herbalHighDose: newDonorForm.herbalHighDose,
-        },
-        bloodExposure: {
-          bloodProduct12m: newDonorForm.bloodProduct12m,
-          needlePrick: newDonorForm.needlePrick,
-          repeatedTransfusions: newDonorForm.repeatedTransfusions,
-        },
+        birth_date: newDonorForm.dob,
+        profile: {
+          personal_information: {
+            occupation: newDonorForm.occupation,
+            marital_status: newDonorForm.maritalStatus,
+            home_address: newDonorForm.address
+          },
+          traveling_information: {
+            travelled_recently: newDonorForm.travel.toLowerCase(),
+            country_visited: newDonorForm.travelCountries,
+            purpose: newDonorForm.travelPurpose
+          },
+          donation_information: {
+            reason: newDonorForm.donationReasons,
+            spouse_consent: newDonorForm.spouseSupport.toLowerCase(),
+            previously_donated: newDonorForm.prevDonations.toLowerCase(),
+            last_donation: newDonorForm.lastDonationDate || undefined,
+            place_donated: newDonorForm.lastDonationLocation,
+            reason_for_stopping: newDonorForm.stoppedReason
+          },
+          medical_information: {
+            infectious_medical_illness: {
+              tuberculosis: newDonorForm.tuberculosis.toLowerCase(),
+              hepatitis_b: newDonorForm.hepatitisB.toLowerCase(),
+              mastitis: newDonorForm.mastitis.toLowerCase(),
+              syphilis: newDonorForm.syphilis.toLowerCase(),
+              herpes: newDonorForm.herpes.toLowerCase(),
+              std: newDonorForm.std.toLowerCase()
+            },
+            substance_user_habits: {
+              consumed_alcohol: newDonorForm.alcohol24h.toLowerCase(),
+              smoke: newDonorForm.smoke.toLowerCase(),
+              illegal_drugs: newDonorForm.illegalDrugs.toLowerCase(),
+              intravenous_drug_use: newDonorForm.intravenousDrugs.toLowerCase()
+            },
+            diet_supplement_tracking: {
+              vegetarian: newDonorForm.vegetarian.toLowerCase(),
+              multivitamins: newDonorForm.multivitamins.toLowerCase(),
+              herbal_drugs: newDonorForm.herbalHighDose.toLowerCase()
+            },
+            blood_exposure_transfusion: {
+              received_blood: newDonorForm.bloodProduct12m.toLowerCase(),
+              needle_contact: newDonorForm.needlePrick.toLowerCase(),
+              repeated_blood_transfusion: newDonorForm.repeatedTransfusions.toLowerCase()
+            },
+            surgical_specialized_medical_history: {
+              hormone_control: "no", breast_surgery: "no", breast_implant: "no"
+            },
+            exposure_behavior: {
+              tattoos: "no", polygamy: "no", std: newDonorForm.std.toLowerCase()
+            }
+          }
+        }
       };
-      setApplicants([newApplicant, ...applicants]);
-    } else {
-      setDonors([newDonor, ...donors]);
+
+      if (isEditMode && editTargetId) {
+        // PUT request: Send the object directly as JSON
+        await api.put(`/api/donors/${editTargetId}`, donorPayload, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } else {
+        // POST request: Backend needs FormData for the image-upload middleware
+        const formData = new FormData();
+        formData.append("json", JSON.stringify(donorPayload));
+        await api.post('/api/donors/register', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+
+      // Cleanup
+      setIsRegisterOpen(false);
+      setIsEditMode(false);
+      setEditTargetId(null);
+      fetchAllDonors();
+      alert("Success!");
+    } catch (error) {
+      console.error("Operation failed:", error);
+      alert("Action failed. Check console for details.");
     }
-    setIsRegisterOpen(false);
-    // Reset form
-    setNewDonorForm({
-      name: '',
-      dob: '',
-      occupation: '',
-      maritalStatus: 'Single',
-      address: '',
-      phone: '',
-      email: '',
-      travel: 'No',
-      travelCountries: '',
-      travelPurpose: '',
-      donationReasons: '',
-      spouseSupport: 'Yes',
-      prevDonations: 'No',
-      lastDonationDate: '',
-      lastDonationLocation: '',
-      stoppedReason: '',
-      tuberculosis: 'No',
-      hepatitisB: 'No',
-      mastitis: 'No',
-      syphilis: 'No',
-      herpes: 'No',
-      std: 'No',
-      alcohol24h: 'No',
-      smoke: 'No',
-      illegalDrugs: 'No',
-      intravenousDrugs: 'No',
-      vegetarian: 'No',
-      multivitamins: 'No',
-      herbalHighDose: 'No',
-      bloodProduct12m: 'No',
-      needlePrick: 'No',
-      repeatedTransfusions: 'No',
-    });
-    setRegisterTab(1);
   };
 
   // Mock status badge color mappings
@@ -731,7 +842,6 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     <>
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
-                      <option value="Pending">Pending</option>
                     </>
                   ) : (
                     <>
@@ -746,27 +856,30 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               {/* Limit Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-neutral-400">Show:</span>
-                <select
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
                   value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value))}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-2.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
+                  onChange={(e) => setLimit(Math.min(Number(e.target.value) || 1, 100))}
+                  className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
                   data-testid="limit-select"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
+                />
               </div>
             </div>
 
             {/* New Donor button (mainly on donors list or both) */}
             {mode === 'applicants' && (
               <button
-                onClick={() => setIsRegisterOpen(true)}
-                className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all duration-200 shrink-0 shadow-[0_4px_12px_rgba(0,105,111,0.15)] hover:shadow-lg hover:-translate-y-0.5"
-                data-testid="new-donor-btn"
-              >
-                <Plus className="size-4 stroke-[3px]" />
+                  onClick={() => {
+                    setIsEditMode(false);
+                    setEditTargetId(null);
+                    setIsRegisterOpen(true);
+                  }}
+                  className="px-5 py-2.5 text-sm font-bold text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap"
+                  data-testid="new-donor-btn"
+                >
+                <Plus className="size-4" />
                 New Donor
               </button>
             )}
@@ -786,7 +899,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                         <th className="px-8 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('name')} data-testid="th-name">
                           Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
                         </th>
-                        <th className="px-8 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('status')} data-testid="th-status">
+                        <th className="px-8 py-4 cursor-pointer hover:text-brand-teal text-center" onClick={() => handleSort('status')} data-testid="th-status">
                           Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
                         </th>
                         <th className="px-8 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('dateJoined')} data-testid="th-date">
@@ -804,7 +917,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                         <th className="px-8 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('name')} data-testid="th-name">
                           Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
                         </th>
-                        <th className="px-8 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('application_status')} data-testid="th-status">
+                        <th className="px-8 py-4 cursor-pointer hover:text-brand-teal text-center" onClick={() => handleSort('application_status')} data-testid="th-status">
                           Application Status {sortBy === 'application_status' && (sortOrder === 'asc' ? '↑' : '↓')}
                         </th>
                         <th className="px-8 py-4 cursor-pointer hover:text-brand-teal" onClick={() => handleSort('dateApplied')} data-testid="th-date">
@@ -818,35 +931,47 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {pagedItems.map((item) => (
-                    <tr
-                      key={item.id}
-                      onClick={() => mode === 'donors' ? setSelectedDonor(item as Donor) : setSelectedApplicant(item as Applicant)}
-                      className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
-                      data-testid={`row-${item.id}`}
-                    >
-                      <td className="px-8 py-4.5 font-bold text-neutral-900">{item.id}</td>
-                      <td className="px-8 py-4.5 font-bold text-neutral-900">{item.name}</td>
-                      <td className="px-8 py-4.5">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status)}`}>
-                          {mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-4.5 text-neutral-500">
-                        {mode === 'donors' ? (item as Donor).dateJoined : (item as Applicant).dateApplied}
-                      </td>
-                      <td className="px-8 py-4.5 text-neutral-500">
-                        {mode === 'donors' ? (item as Donor).lastDonation : (item as Applicant).email}
-                      </td>
-                    </tr>
-                  ))}
-
-                  {pagedItems.length === 0 && (
+                  {isLoadingData ? (
+                    [...Array(5)].map((_, index) => (
+                      <tr key={`skeleton-${index}`} className="animate-pulse border-b border-neutral-100 pointer-events-none">
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-10"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-32"></div></td>
+                        <td className="px-8 py-4.5 text-center"><div className="h-5 bg-neutral-100 rounded-full w-20 mx-auto"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-24"></div></td>
+                        <td className="px-8 py-4.5"><div className="h-4 bg-neutral-200 rounded-lg w-24"></div></td>
+                      </tr>
+                    ))
+                  ) : pagedItems.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-8 py-16 text-center text-neutral-400 font-medium">
+                      <td colSpan={5} className="px-8 py-16 text-center text-neutral-400 font-medium font-sans">
                         No records match the active search and filter settings.
                       </td>
                     </tr>
+                  ) : (
+                    pagedItems.map((item) => (
+                      <tr
+                        key={item.id}
+                        onClick={() => mode === 'donors' ? setSelectedDonor(item as Donor) : setSelectedApplicant(item as Applicant)}
+                        className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
+                        data-testid={`row-${item.id}`}
+                      >
+                        <td className="px-8 py-4.5 font-bold text-neutral-900">{item.id}</td>
+                        <td className="px-8 py-4.5 font-bold text-neutral-900">{item.name}</td>
+                        <td className="px-8 py-4.5 text-center">
+                          <div className="flex justify-center">
+                            <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status)}`}>
+                              {mode === 'donors' ? (item as Donor).status : (item as Applicant).application_status}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-4.5 text-neutral-500">
+                          {mode === 'donors' ? (item as Donor).dateJoined : (item as Applicant).dateApplied}
+                        </td>
+                        <td className="px-8 py-4.5 text-neutral-500">
+                          {mode === 'donors' ? (item as Donor).lastDonation : (item as Applicant).email}
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -854,41 +979,24 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="bg-neutral-50/50 border-t border-neutral-100 px-8 py-4.5 flex items-center justify-between gap-4 font-sans text-xs">
-                <span className="text-neutral-500 font-bold">
-                  Showing {(page - 1) * limit + 1} - {Math.min(page * limit, totalItems)} of {totalItems} entries
+              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500 font-sans">
+                <span>
+                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries
                 </span>
-                
-                <div className="flex items-center gap-1.5" data-testid="pagination-nav">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="p-2 border border-neutral-200 rounded-xl hover:bg-white text-neutral-500 disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
-                    data-testid="prev-btn"
+                    onClick={() => setPage(page - 1)}
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="prev-page-btn"
                   >
                     <ChevronLeft className="size-4" />
                   </button>
-                  
-                  {Array.from({ length: totalPages }).map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setPage(idx + 1)}
-                      className={`size-8 font-bold border rounded-xl transition-all cursor-pointer ${
-                        page === idx + 1
-                          ? 'bg-brand-teal border-brand-teal text-white shadow-sm'
-                          : 'border-neutral-200 hover:bg-white text-neutral-600'
-                      }`}
-                      data-testid={`page-btn-${idx + 1}`}
-                    >
-                      {idx + 1}
-                    </button>
-                  ))}
-
                   <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
-                    className="p-2 border border-neutral-200 rounded-xl hover:bg-white text-neutral-500 disabled:opacity-40 disabled:hover:bg-transparent transition-colors cursor-pointer"
-                    data-testid="next-btn"
+                    onClick={() => setPage(page + 1)}
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="next-page-btn"
                   >
                     <ChevronRight className="size-4" />
                   </button>
@@ -928,7 +1036,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
               
               {/* Left Column: Side Profile */}
               <div className="w-full md:w-72 shrink-0 space-y-6">
-                <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col items-center gap-5 text-center shadow-sm">
+                <div className="bg-white border border-neutral-200 rounded-3xl p-6 flex flex-col items-center gap-5 text-center shadow-sm">
                   {/* Avatar circle */}
                   <div className="size-36 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
                     {(selectedDonor || selectedApplicant)?.name.split(' ').map((n) => n[0]).join('')}
@@ -974,41 +1082,96 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
                 {/* Profile actions */}
                 <div className="space-y-3.5">
+                  
+                  {/* BUTTON 1: TOGGLE STATUS OR APPROVE */}
                   <button 
                     onClick={() => {
-                      if (mode === 'donors' && selectedDonor) {
-                        setDonors(donors.map((d) => d.id === selectedDonor.id ? { ...d, status: d.status === 'Active' ? 'Inactive' : 'Active' } : d));
-                        setSelectedDonor(null);
-                      } else if (mode === 'applicants' && selectedApplicant) {
-                        setApplicants(applicants.map((a) => a.id === selectedApplicant.id ? { ...a, application_status: a.application_status === 'Approved' ? 'Pending' : 'Approved' } : a));
-                        setSelectedApplicant(null);
+                      const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
+                      if (!targetId) return;
+                      setActionError('');
+                      if (mode === 'donors') {
+                        setConfirmAction(selectedDonor?.status === 'Active' ? 'deactivate' : 'activate');
+                      } else {
+                        setConfirmAction('approve');
                       }
                     }}
-                    className="w-full py-2.5 text-xs font-bold text-neutral-600 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm"
-                    data-testid="toggle-profile-status-btn"
+                    className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
                   >
                     {mode === 'donors' 
                       ? ((selectedDonor?.status === 'Active') ? 'Deactivate Profile' : 'Activate Profile')
-                      : ((selectedApplicant?.application_status === 'Approved') ? 'Mark as Pending' : 'Approve Profile')
+                      : 'Approve Application'
                     }
                   </button>
+
+                  {/* NEW BUTTON: EDIT PROFILE */}
                   <button 
                     onClick={() => {
-                      if (mode === 'donors' && selectedDonor) {
-                        setDonors(donors.filter((d) => d.id !== selectedDonor.id));
-                        setSelectedDonor(null);
-                      } else if (mode === 'applicants' && selectedApplicant) {
-                        setApplicants(applicants.filter((a) => a.id !== selectedApplicant.id));
-                        setSelectedApplicant(null);
-                      }
+                      const target = mode === 'donors' ? selectedDonor : selectedApplicant;
+                      if (!target) return;
+
+                      // Pre-fill the registration form with this person's existing data
+                      setNewDonorForm({
+                        name: target.name, dob: target.dob, occupation: target.occupation,
+                        maritalStatus: target.maritalStatus, address: target.address,
+                        phone: target.phone, email: target.email, travel: target.travel,
+                        travelCountries: target.travelCountries, travelPurpose: target.travelPurpose,
+                        donationReasons: target.donationReasons, spouseSupport: target.spouseSupport,
+                        prevDonations: target.prevDonations, lastDonationDate: target.lastDonationDate,
+                        lastDonationLocation: target.lastDonationLocation, stoppedReason: target.stoppedReason,
+                        tuberculosis: target.medicalHistory.tuberculosis, hepatitisB: target.medicalHistory.hepatitisB,
+                        mastitis: target.medicalHistory.mastitis, syphilis: target.medicalHistory.syphilis,
+                        herpes: target.medicalHistory.herpes, std: target.medicalHistory.std,
+                        alcohol24h: target.habits.alcohol24h, smoke: target.habits.smoke,
+                        illegalDrugs: target.habits.illegalDrugs, intravenousDrugs: target.habits.intravenousDrugs,
+                        vegetarian: target.diet.vegetarian, multivitamins: target.diet.multivitamins,
+                        herbalHighDose: target.diet.herbalHighDose, bloodProduct12m: target.bloodExposure.bloodProduct12m,
+                        needlePrick: target.bloodExposure.needlePrick, repeatedTransfusions: target.bloodExposure.repeatedTransfusions,
+                      });
+
+                      // Trigger Edit Mode and open the modal
+                      setIsEditMode(true);
+                      setEditTargetId(target.id);
+                      setSelectedDonor(null);
+                      setSelectedApplicant(null);
+                      setIsRegisterOpen(true);
                     }}
-                    className="w-full py-2.5 text-xs font-bold text-rose-600 hover:text-white bg-white hover:bg-rose-600 border border-neutral-200 hover:border-rose-600 rounded-xl transition-all shadow-sm"
-                    data-testid="delete-profile-btn"
+                    className="w-full py-3 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    Edit Profile
+                  </button>
+
+                  {/* BUTTON 2: REJECT APPLICANT */}
+                  {mode === 'applicants' && (
+                    <button 
+                      onClick={() => {
+                        const targetId = selectedApplicant?.id;
+                        if (!targetId) return;
+                        setActionError('');
+                        setConfirmAction('reject');
+                      }}
+                      className="w-full py-3 text-xs font-bold text-rose-600 hover:text-rose-700 bg-white border border-neutral-200 hover:border-rose-200 hover:bg-rose-50/50 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
+                    >
+                      Reject Application
+                    </button>
+                  )}
+
+                  {/* BUTTON 3: PERMANENTLY DELETE */}
+                  <button 
+                    onClick={() => {
+                      const targetId = mode === 'donors' ? selectedDonor?.id : selectedApplicant?.id;
+                      if (!targetId) return;
+                      setActionError('');
+                      setConfirmAction('delete');
+                    }}
+                    className="w-full py-3 text-xs font-bold text-rose-600 hover:text-rose-700 bg-white border border-neutral-200 hover:border-rose-200 hover:bg-rose-50/50 rounded-2xl transition-all shadow-sm text-center cursor-pointer"
                   >
                     Delete Profile
                   </button>
                 </div>
               </div>
+
+
+
 
               {/* Right Column: Main Collapsible Cards */}
               <div className="flex-1 space-y-6">
@@ -1268,7 +1431,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
             <div className="bg-white border-b border-neutral-200 px-6 py-4.5 sticky top-0 flex items-center justify-between z-10">
               <div className="flex items-center gap-3">
                 <Plus className="size-5 text-brand-teal" />
-                <h3 className="text-lg font-bold text-neutral-900">New Donor Registration</h3>
+                <h3 className="text-lg font-bold text-neutral-900">{isEditMode ? 'Edit Donor Profile' : 'New Donor Registration'}</h3>
               </div>
               <button
                 type="button"
@@ -1759,7 +1922,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     className="px-6 py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all shadow-[0_4px_12px_rgba(0,105,111,0.1)] cursor-pointer"
                     data-testid="register-submit-btn"
                   >
-                    Submit Registration
+                    {isEditMode ? 'Save Changes' : 'Submit Registration'}
                   </button>
                 )}
               </div>
@@ -1769,6 +1932,83 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
         </div>
       )}
 
+      {/* ACTION CONFIRMATION MODAL */}
+      {confirmAction && (selectedDonor || selectedApplicant) && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-sm relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {confirmAction === 'delete' || confirmAction === 'deactivate' || confirmAction === 'reject' ? (
+                  <Trash2 className="size-5 text-red-500" />
+                ) : (
+                  <CheckCircle2 className="size-5 text-brand-teal" />
+                )}
+                <h3 className="text-base font-bold text-neutral-900 capitalize">
+                  Confirm {confirmAction}
+                </h3>
+              </div>
+              <button
+                onClick={() => setConfirmAction(null)}
+                disabled={isActionLoading}
+                className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all disabled:opacity-50"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-neutral-600 leading-relaxed">
+                {confirmAction === 'delete' 
+                  ? `Are you sure you want to permanently delete profile ${(selectedDonor || selectedApplicant)?.name}? This action cannot be undone and will erase it from the database.`
+                  : confirmAction === 'deactivate'
+                  ? `Are you sure you want to deactivate donor ${selectedDonor?.name}? They will no longer be able to donate until reactivated.`
+                  : confirmAction === 'reject'
+                  ? `Are you sure you want to reject application from ${selectedApplicant?.name}?`
+                  : confirmAction === 'approve'
+                  ? `Are you sure you want to approve application from ${selectedApplicant?.name}?`
+                  : `Are you sure you want to activate donor ${selectedDonor?.name}?`}
+              </p>
+
+              {actionError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium animate-in fade-in duration-200">
+                  {actionError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setConfirmAction(null)}
+                  disabled={isActionLoading}
+                  className="flex-1 h-11 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={executeConfirmAction}
+                  disabled={isActionLoading}
+                  className={`flex-1 h-11 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    confirmAction === 'delete' || confirmAction === 'deactivate' || confirmAction === 'reject' 
+                      ? 'bg-red-500 hover:bg-red-600' 
+                      : 'bg-brand-teal hover:bg-brand-teal-darker'
+                  }`}
+                >
+                  {isActionLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    <span className="capitalize">{confirmAction}</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
