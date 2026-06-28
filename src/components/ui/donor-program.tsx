@@ -27,6 +27,8 @@ export default function DonorProgram() {
 
   return (
     <section id="services" className="py-20 bg-brand-teal text-white px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Anchor for #donor */}
+      <div id="donor" className="absolute top-0 left-0" />
       {/* Decorative background shapes */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-brand-teal-dark/30 rounded-full blur-3xl -translate-y-12 translate-x-12 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-brand-teal-dark/30 rounded-full blur-3xl translate-y-12 -translate-x-12 pointer-events-none" />

@@ -77,7 +77,7 @@ export default function SelectProgram({
                   <p className="text-neutral-600 font-sans text-sm sm:text-[15px] leading-relaxed">
                     To become a donor for the Makati Human Milk Bank, lactating mothers must complete a health history screening and pass fully funded blood tests for transmissible infections like HIV and Hepatitis. Once medically cleared, mothers can donate through specific donation programs.{' '}
                     <Link 
-                      href="#about"
+                      href="/#donor"
                       className="text-brand-teal font-semibold hover:text-brand-teal-dark underline transition-colors"
                     >
                       Learn more.
