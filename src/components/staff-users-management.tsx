@@ -18,6 +18,10 @@ import {
   EyeOff,
   ChevronDown,
   Plus,
+  Camera,
+  Trash2,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
@@ -31,12 +35,12 @@ import {
 } from '../utils/storage';
 
 // --- CUSTOM DROPDOWN ---
-const CustomDropdown = ({ 
-  value, 
-  onChange, 
-  options, 
-  icon: Icon, 
-  triggerClassName, 
+const CustomDropdown = ({
+  value,
+  onChange,
+  options,
+  icon: Icon,
+  triggerClassName,
   dropdownClassName,
   optionClassName,
   disabled,
@@ -68,7 +72,7 @@ const CustomDropdown = ({
         <span>{selectedOption?.label || value}</span>
         <ChevronDown className={`size-3.5 opacity-60 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
-      
+
       {isOpen && (
         <div className={`absolute top-full mt-1.5 w-full bg-white border border-neutral-200 rounded-xl shadow-lg z-[60] overflow-hidden min-w-[140px] left-0 ${dropdownClassName || ''}`}>
           {options.map((option: any) => (
@@ -113,8 +117,8 @@ export default function StaffUsersManagement() {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('id');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(5);
   const [totalPages, setTotalPages] = useState(1);
@@ -130,9 +134,10 @@ export default function StaffUsersManagement() {
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState<'manager' | 'staff'>('staff');
-  const [newStatus, setNewStatus] = useState<'Active' | 'Inactive'>('Active');
   const [newPhone, setNewPhone] = useState('+639171234567');
   const [newPassword, setNewPassword] = useState('');
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
 
   // Edit User Form State
@@ -153,12 +158,20 @@ export default function StaffUsersManagement() {
   const [resetPassError, setResetPassError] = useState<string | null>(null);
   const [resetPassSuccess, setResetPassSuccess] = useState<string | null>(null);
 
-  // Global Action Feedback/Toast State
-  const [successToast, setSuccessToast] = useState<string | null>(null);
+  // Global Action Feedback/Toast State (matches other pages)
+  const [actionFeedback, setActionFeedback] = useState<{ message: string | string[]; type: 'success' | 'error' } | null>(null);
+
+  const showFeedback = (message: string | string[], type: 'success' | 'error') => {
+    setActionFeedback({ message, type });
+    setTimeout(() => setActionFeedback(null), 3500);
+  };
 
   // Custom Role Confirmation Modal State
   const [isRoleConfirmOpen, setIsRoleConfirmOpen] = useState(false);
   const [pendingRoleUpdatePayload, setPendingRoleUpdatePayload] = useState<any>(null);
+
+  // Delete Confirmation Modal State
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   // Fetch Users from Database
   const fetchUsers = async () => {
@@ -211,6 +224,7 @@ export default function StaffUsersManagement() {
         role: u.role,
         phone: u.phone,
         status: u.status === 'active' ? 'Active' : 'Inactive',
+        created_at: u.created_at,
       } as StaffUser));
 
       // Sort alphabetically/numerically on frontend
@@ -312,7 +326,7 @@ export default function StaffUsersManagement() {
     }
 
     if (newPassword.length < 8) {
-      setAddError('Initial password must be at least 8 characters.');
+      setAddError('Password must be at least 8 characters.');
       return;
     }
 
@@ -322,20 +336,29 @@ export default function StaffUsersManagement() {
     }
 
     try {
-      const payload = {
-        name: newName.trim(),
-        email: newEmail.trim().toLowerCase(),
-        password: newPassword,
-        role: newRole,
-        status: newStatus.toLowerCase(), // 'active' | 'inactive'
-        phone: newPhone.trim(),
-      };
+      const formData = new FormData();
+      formData.append('name', newName.trim());
+      formData.append('email', newEmail.trim().toLowerCase());
+      formData.append('password', newPassword);
+      formData.append('role', newRole);
+      formData.append('status', 'active');
+      formData.append('phone', newPhone.trim());
 
-      const response = await api.post('/api/users', payload);
+      if (profileImageFile) {
+        formData.append('profile_image_url', profileImageFile);
+      }
+
+      const response = await api.post('/api/users', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       if (response.data?.success) {
-        setSuccessToast(`User ${newName} created successfully.`);
-        setTimeout(() => setSuccessToast(null), 3500);
+        showFeedback(`User ${newName} created successfully.`, 'success');
         setIsAddModalOpen(false);
+        setProfileImageFile(null);
+        setProfileImagePreview(null);
+        await new Promise(r => setTimeout(r, 300));
         fetchUsers();
       }
     } catch (err: any) {
@@ -401,9 +424,9 @@ export default function StaffUsersManagement() {
           saveProfile(updatedProfile);
         }
 
-        setSuccessToast(`User details updated successfully.`);
-        setTimeout(() => setSuccessToast(null), 3500);
+        showFeedback('User details updated successfully.', 'success');
         setIsEditMode(false);
+        await new Promise(r => setTimeout(r, 300));
         fetchUsers();
       }
     } catch (err: any) {
@@ -424,12 +447,30 @@ export default function StaffUsersManagement() {
         };
         setSelectedUser(updated);
 
-        setSuccessToast(`User status set to ${newStatusVal}.`);
-        setTimeout(() => setSuccessToast(null), 3500);
+        showFeedback(`User status set to ${newStatusVal}.`, 'success');
+        await new Promise(r => setTimeout(r, 300));
         fetchUsers();
       }
     } catch (err: any) {
       console.error('Failed to toggle status:', err);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const response = await api.delete(`/api/users/${selectedUser.id}`);
+      if (response.data?.success) {
+        showFeedback(`User ${selectedUser.name} has been deleted.`, 'success');
+        setIsDeleteConfirmOpen(false);
+        setSelectedUser(null);
+        await new Promise(r => setTimeout(r, 300));
+        fetchUsers();
+      }
+    } catch (err: any) {
+      showFeedback(formatBackendError(err.response?.data?.message || err.message || 'Failed to delete user.'), 'error');
+      setIsDeleteConfirmOpen(false);
     }
   };
 
@@ -499,6 +540,36 @@ export default function StaffUsersManagement() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-neutral-900 flex font-sans">
+      {/* Toast Notification */}
+      {actionFeedback && (
+        <div className={`fixed top-6 right-6 z-[100] flex items-start gap-3 px-4 py-3.5 rounded-xl shadow-lg border max-w-md transition-all duration-300 transform translate-y-0 ${actionFeedback.type === 'success'
+            ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-emerald-100/50'
+            : 'bg-rose-50 text-rose-800 border-rose-200 shadow-rose-100/50'
+          }`} data-testid="success-toast">
+          <div className={`p-1 rounded-lg shrink-0 mt-0.5 ${actionFeedback.type === 'success' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+            {actionFeedback.type === 'success' ? (
+              <Check className="size-4 text-emerald-600" />
+            ) : (
+              <X className="size-4 text-rose-600" />
+            )}
+          </div>
+          <div className="flex-1 text-xs sm:text-sm font-semibold min-w-0">
+            {Array.isArray(actionFeedback.message) ? (
+              <div className="space-y-1">
+                <p className="font-bold text-rose-900">Please correct the following fields:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-rose-700 font-medium">
+                  {actionFeedback.message.map((msg, index) => (
+                    <li key={index} className="break-words">{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <span className="break-words">{actionFeedback.message}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <StaffSidebar activeItem="users" />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
@@ -517,11 +588,6 @@ export default function StaffUsersManagement() {
 
         {/* Workspace Body */}
         <main className="p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
-          {successToast && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-4 font-sans text-sm font-semibold animate-in fade-in duration-200" data-testid="success-toast">
-              {successToast}
-            </div>
-          )}
 
           {/* Action and Filter Row */}
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
@@ -591,9 +657,10 @@ export default function StaffUsersManagement() {
                 setNewName('');
                 setNewEmail('');
                 setNewRole('staff');
-                setNewStatus('Active');
                 setNewPhone('+639171234567');
                 setNewPassword('');
+                setProfileImageFile(null);
+                setProfileImagePreview(null);
                 setIsAddModalOpen(true);
               }}
               className="px-5 py-2.5 text-sm font-bold text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0"
@@ -720,6 +787,60 @@ export default function StaffUsersManagement() {
                 </div>
               )}
 
+              {/* Profile Image Upload */}
+              <div className="flex flex-col items-center gap-2 pb-2">
+                <div className="relative group">
+                  <div
+                    className="size-20 rounded-full border-2 border-dashed border-neutral-300 group-hover:border-brand-teal flex items-center justify-center overflow-hidden bg-neutral-50 transition-all cursor-pointer"
+                    onClick={() => document.getElementById('add-user-profile-image')?.click()}
+                    data-testid="add-user-avatar-picker"
+                  >
+                    {profileImagePreview ? (
+                      <img src={profileImagePreview} alt="Profile preview" className="size-full object-cover" />
+                    ) : (
+                      <Camera className="size-6 text-neutral-400 group-hover:text-brand-teal transition-colors" />
+                    )}
+                  </div>
+                  {profileImagePreview && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProfileImageFile(null);
+                        setProfileImagePreview(null);
+                      }}
+                      className="absolute -top-1 -right-1 size-6 bg-rose-500 hover:bg-rose-600 text-white rounded-full flex items-center justify-center shadow-md transition-all cursor-pointer"
+                      data-testid="remove-avatar-btn"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  )}
+                </div>
+                <input
+                  id="add-user-profile-image"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  data-testid="add-user-profile-image-input"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (!file.type.startsWith('image/')) {
+                        setAddError('Only image files are allowed.');
+                        return;
+                      }
+                      if (file.size > 5 * 1024 * 1024) {
+                        setAddError('Image must be under 5 MB.');
+                        return;
+                      }
+                      setProfileImageFile(file);
+                      setProfileImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+                <span className="text-[10px] text-neutral-400 font-medium">Click to upload profile photo</span>
+              </div>
+
               {/* Full Name */}
               <div className="space-y-1.5">
                 <label className="text-neutral-500 font-bold block">Full Name *</label>
@@ -761,7 +882,7 @@ export default function StaffUsersManagement() {
 
               {/* Password */}
               <div className="space-y-1.5">
-                <label className="text-neutral-500 font-bold block">Initial Password *</label>
+                <label className="text-neutral-500 font-bold block">Password *</label>
                 <div className="relative">
                   <input
                     type={showNewPassword ? 'text' : 'password'}
@@ -783,36 +904,19 @@ export default function StaffUsersManagement() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                {/* Role */}
-                <div className="space-y-1.5">
-                  <label className="text-neutral-500 font-bold block">Role Level</label>
-                  <CustomDropdown
-                    value={newRole}
-                    onChange={(val: any) => setNewRole(val as 'manager' | 'staff')}
-                    triggerClassName="w-full px-3 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all text-xs font-bold text-neutral-600 bg-white"
-                    options={[
-                      { value: 'staff', label: 'Staff' },
-                      { value: 'manager', label: 'Manager' }
-                    ]}
-                    data-testid="add-user-role"
-                  />
-                </div>
-
-                {/* Status */}
-                <div className="space-y-1.5">
-                  <label className="text-neutral-500 font-bold block">Status</label>
-                  <CustomDropdown
-                    value={newStatus}
-                    onChange={(val: any) => setNewStatus(val as 'Active' | 'Inactive')}
-                    triggerClassName="w-full px-3 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all text-xs font-bold text-neutral-600 bg-white"
-                    options={[
-                      { value: 'Active', label: 'Active' },
-                      { value: 'Inactive', label: 'Inactive' }
-                    ]}
-                    data-testid="add-user-status"
-                  />
-                </div>
+              {/* Role */}
+              <div className="space-y-1.5">
+                <label className="text-neutral-500 font-bold block">Role Level</label>
+                <CustomDropdown
+                  value={newRole}
+                  onChange={(val: any) => setNewRole(val as 'manager' | 'staff')}
+                  triggerClassName="w-full px-3 py-2.5 rounded-xl border border-neutral-200 focus:ring-2 focus:ring-brand-teal/20 focus:border-brand-teal outline-none transition-all text-xs font-bold text-neutral-600 bg-white"
+                  options={[
+                    { value: 'staff', label: 'Staff' },
+                    { value: 'manager', label: 'Manager' }
+                  ]}
+                  data-testid="add-user-role"
+                />
               </div>
 
               <div className="pt-4 border-t border-neutral-100 flex gap-3 justify-end">
@@ -847,7 +951,7 @@ export default function StaffUsersManagement() {
               </div>
               <h3 className="text-base font-bold text-neutral-900">Change Access Role</h3>
             </div>
-            
+
             <p className="text-xs font-semibold text-neutral-600 leading-relaxed animate-in fade-in" data-testid="role-confirm-msg">
               Are you sure to change {selectedUser.name}'s role from {selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1)} to {pendingRoleUpdatePayload.role.charAt(0).toUpperCase() + pendingRoleUpdatePayload.role.slice(1)}?
             </p>
@@ -960,8 +1064,8 @@ export default function StaffUsersManagement() {
                       <button
                         onClick={handleToggleStatus}
                         className={`py-2.5 px-4 font-bold rounded-xl border transition-all text-center cursor-pointer ${selectedUser.status === 'Active'
-                            ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
-                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                          ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
                           }`}
                         data-testid="toggle-status-btn"
                       >
@@ -980,6 +1084,13 @@ export default function StaffUsersManagement() {
                       data-testid="reset-password-btn"
                     >
                       Reset Password
+                    </button>
+                    <button
+                      onClick={() => setIsDeleteConfirmOpen(true)}
+                      className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl border border-rose-200 transition-all text-center cursor-pointer"
+                      data-testid="delete-user-btn"
+                    >
+                      Delete User
                     </button>
                   </div>
                 </div>
@@ -1156,6 +1267,43 @@ export default function StaffUsersManagement() {
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE USER CONFIRMATION MODAL */}
+      {isDeleteConfirmOpen && selectedUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-150" data-testid="delete-confirm-modal">
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-sm relative animate-in zoom-in-95 duration-150 overflow-hidden flex flex-col p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="size-10 bg-rose-50 border border-rose-100 rounded-xl flex items-center justify-center text-rose-600 shrink-0">
+                <AlertTriangle className="size-5" />
+              </div>
+              <h3 className="text-base font-bold text-neutral-900">Delete User</h3>
+            </div>
+
+            <p className="text-xs font-semibold text-neutral-600 leading-relaxed" data-testid="delete-confirm-msg">
+              Are you sure you want to permanently delete <span className="font-bold text-neutral-900">{selectedUser.name}</span>? This action cannot be undone.
+            </p>
+
+            <div className="flex gap-3 justify-end pt-2 border-t border-neutral-100">
+              <button
+                type="button"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 font-bold transition-all cursor-pointer text-xs"
+                data-testid="cancel-delete-btn"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all cursor-pointer text-xs"
+                data-testid="confirm-delete-btn"
+              >
+                Delete Permanently
+              </button>
             </div>
           </div>
         </div>

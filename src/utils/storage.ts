@@ -44,6 +44,7 @@ export interface StaffUser {
   status: 'Active' | 'Inactive';
   password?: string;
   phone?: string;
+  created_at?: string;
 }
 
 export interface AuditLog {

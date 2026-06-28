@@ -155,28 +155,28 @@ describe('StaffUsersManagement Component (API Integrated)', () => {
     fireEvent.change(screen.getByTestId('add-user-email'), { target: { value: 'charlie@mhmb.gov' } });
     fireEvent.change(screen.getByTestId('add-user-password'), { target: { value: 'securepassword123' } });
 
-    // Select role and status via custom dropdown clicks
+    // Select role via custom dropdown clicks
     fireEvent.click(screen.getByTestId('add-user-role'));
     fireEvent.click(screen.getByTestId('option-staff'));
-
-    fireEvent.click(screen.getByTestId('add-user-status'));
-    fireEvent.click(screen.getByTestId('option-Active'));
 
     // Submit form
     await act(async () => {
       fireEvent.submit(screen.getByTestId('submit-add-user-btn'));
     });
 
-    // Modal should close and api.post should be called
+    // Modal should close and api.post should be called with FormData
     expect(screen.queryByTestId('add-modal')).not.toBeInTheDocument();
-    expect(api.post).toHaveBeenCalledWith('/api/users', {
-      name: 'Charlie Brown',
-      email: 'charlie@mhmb.gov',
-      password: 'securepassword123',
-      role: 'staff',
-      status: 'active',
-      phone: '+639171234567',
-    });
+    expect(api.post).toHaveBeenCalled();
+    const [url, formData, config] = (api.post as jest.Mock).mock.calls[0];
+    expect(url).toBe('/api/users');
+    expect(formData).toBeInstanceOf(FormData);
+    expect(formData.get('name')).toBe('Charlie Brown');
+    expect(formData.get('email')).toBe('charlie@mhmb.gov');
+    expect(formData.get('password')).toBe('securepassword123');
+    expect(formData.get('role')).toBe('staff');
+    expect(formData.get('status')).toBe('active');
+    expect(formData.get('phone')).toBe('+639171234567');
+    expect(config.headers['Content-Type']).toBe('multipart/form-data');
   });
 
   it('allows manager to view user details, update user information via API', async () => {

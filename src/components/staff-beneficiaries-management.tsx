@@ -241,7 +241,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
         // Fix: Explicitly determine application status from the record
         let appStatus: 'Approved' | 'Pending' | 'Rejected' = 'Pending';
-        if (b.application_status === 'approved' || b.account_status === 'active') appStatus = 'Approved';
+        if (b.application_status === 'approved') appStatus = 'Approved';
         else if (b.application_status === 'rejected') appStatus = 'Rejected';
         else if (b.application_status === 'pending') appStatus = 'Pending';
 
@@ -765,6 +765,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                   type="button"
                   onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
                   className="flex items-center justify-between gap-2 min-w-[10rem] px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl text-xs font-bold text-neutral-600 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
+                  data-testid="status-select"
                 >
                   <span className="flex items-center gap-2">
                     <SlidersHorizontal className="size-3.5 text-neutral-400" />
@@ -792,6 +793,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
                                 ? 'bg-brand-teal/10 text-brand-teal'
                                 : 'text-neutral-600 hover:bg-slate-50'
                             }`}
+                            data-testid={`option-${status}`}
                           >
                             {status === 'All' ? 'All Statuses' : status}
                           </button>
