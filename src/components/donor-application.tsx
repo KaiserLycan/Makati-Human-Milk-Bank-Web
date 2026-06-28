@@ -506,49 +506,59 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                     <div className="grid grid-cols-1 gap-6">
                       {/* Travelled outside */}
                       <div className="flex flex-col gap-1.5">
-                        <label htmlFor="travelledOutside" className="text-neutral-700 font-sans text-sm font-semibold">
+                        <label className="text-neutral-700 font-sans text-sm font-semibold">
                           Have you travelled outside the country in the last 5 years?
                         </label>
-                        <input
-                          type="text"
-                          id="travelledOutside"
-                          name="travelledOutside"
-                          value={formData.travelledOutside}
-                          onChange={handleInputChange}
-                          placeholder="Please clarify yes/no and detail if applicable"
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
+                        <div className="flex gap-4 mt-1">
+                          {['Yes', 'No'].map((choice) => (
+                            <label key={choice} className="flex items-center gap-2 font-sans text-sm font-medium text-neutral-800 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="travelledOutside"
+                                checked={formData.travelledOutside === choice}
+                                onChange={() => handleRadioChange('travelledOutside', choice)}
+                                className="size-4 text-brand-teal focus:ring-brand-teal border-neutral-300"
+                              />
+                              {choice}
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                      {/* Country visited */}
-                      <div className="flex flex-col gap-1.5">
-                        <label htmlFor="countriesVisited" className="text-neutral-700 font-sans text-sm font-semibold">
-                          What country have you visited?
-                        </label>
-                        <input
-                          type="text"
-                          id="countriesVisited"
-                          name="countriesVisited"
-                          value={formData.countriesVisited}
-                          onChange={handleInputChange}
-                          placeholder="List countries visited"
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
-                      </div>
-                      {/* Purpose of travel */}
-                      <div className="flex flex-col gap-1.5">
-                        <label htmlFor="purposeOfTravel" className="text-neutral-700 font-sans text-sm font-semibold">
-                          What were the purpose of your travel?
-                        </label>
-                        <input
-                          type="text"
-                          id="purposeOfTravel"
-                          name="purposeOfTravel"
-                          value={formData.purposeOfTravel}
-                          onChange={handleInputChange}
-                          placeholder="eg. Vacation, Business, Medical..."
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
-                      </div>
+
+                      {formData.travelledOutside === 'Yes' && (
+                        <>
+                          {/* Country visited */}
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="countriesVisited" className="text-neutral-700 font-sans text-sm font-semibold">
+                              What country have you visited?
+                            </label>
+                            <input
+                              type="text"
+                              id="countriesVisited"
+                              name="countriesVisited"
+                              value={formData.countriesVisited}
+                              onChange={handleInputChange}
+                              placeholder="List countries visited"
+                              className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                            />
+                          </div>
+                          {/* Purpose of travel */}
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="purposeOfTravel" className="text-neutral-700 font-sans text-sm font-semibold">
+                              What were the purpose of your travel?
+                            </label>
+                            <input
+                              type="text"
+                              id="purposeOfTravel"
+                              name="purposeOfTravel"
+                              value={formData.purposeOfTravel}
+                              onChange={handleInputChange}
+                              placeholder="eg. Vacation, Business, Medical..."
+                              className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </fieldset>
     
@@ -576,79 +586,93 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
                       </div>
                       {/* Spouse support */}
                       <div className="flex flex-col gap-1.5">
-                        <label htmlFor="spouseSupport" className="text-neutral-700 font-sans text-sm font-semibold">
+                        <label className="text-neutral-700 font-sans text-sm font-semibold">
                           Does your spouse support your decision to donate?
                         </label>
-                        <input
-                          type="text"
-                          id="spouseSupport"
-                          name="spouseSupport"
-                          value={formData.spouseSupport}
-                          onChange={handleInputChange}
-                          placeholder="eg. Yes / No / Not Applicable"
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
+                        <div className="flex flex-wrap gap-4 mt-1">
+                          {['Yes', 'No', 'Not Applicable'].map((choice) => (
+                            <label key={choice} className="flex items-center gap-2 font-sans text-sm font-medium text-neutral-800 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="spouseSupport"
+                                checked={formData.spouseSupport === choice}
+                                onChange={() => handleRadioChange('spouseSupport', choice)}
+                                className="size-4 text-brand-teal focus:ring-brand-teal border-neutral-300"
+                              />
+                              {choice}
+                            </label>
+                          ))}
+                        </div>
                       </div>
                       {/* Previously donated */}
                       <div className="flex flex-col gap-1.5">
-                        <label htmlFor="previouslyDonated" className="text-neutral-700 font-sans text-sm font-semibold">
+                        <label className="text-neutral-700 font-sans text-sm font-semibold">
                           Have you previously donated milk?
                         </label>
-                        <input
-                          type="text"
-                          id="previouslyDonated"
-                          name="previouslyDonated"
-                          value={formData.previouslyDonated}
-                          onChange={handleInputChange}
-                          placeholder="eg. Yes / No"
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
+                        <div className="flex gap-4 mt-1">
+                          {['Yes', 'No'].map((choice) => (
+                            <label key={choice} className="flex items-center gap-2 font-sans text-sm font-medium text-neutral-800 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="previouslyDonated"
+                                checked={formData.previouslyDonated === choice}
+                                onChange={() => handleRadioChange('previouslyDonated', choice)}
+                                className="size-4 text-brand-teal focus:ring-brand-teal border-neutral-300"
+                              />
+                              {choice}
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                      {/* Last donation date */}
-                      <div className="flex flex-col gap-1.5">
-                        <label htmlFor="lastDonationDate" className="text-neutral-700 font-sans text-sm font-semibold">
-                          When was your last donation?
-                        </label>
-                        <input
-                          type="text"
-                          id="lastDonationDate"
-                          name="lastDonationDate"
-                          value={formData.lastDonationDate}
-                          onChange={handleInputChange}
-                          placeholder="Please specify date if applicable"
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
-                      </div>
-                      {/* Where did you donate */}
-                      <div className="flex flex-col gap-1.5">
-                        <label htmlFor="donationLocation" className="text-neutral-700 font-sans text-sm font-semibold">
-                          Where did you donate?
-                        </label>
-                        <input
-                          type="text"
-                          id="donationLocation"
-                          name="donationLocation"
-                          value={formData.donationLocation}
-                          onChange={handleInputChange}
-                          placeholder="Specify clinic, center, or bank"
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
-                      </div>
-                      {/* Why did you stop donating */}
-                      <div className="flex flex-col gap-1.5 md:col-span-2">
-                        <label htmlFor="whyStoppedDonating" className="text-neutral-700 font-sans text-sm font-semibold">
-                          Why did you stop donating?
-                        </label>
-                        <input
-                          type="text"
-                          id="whyStoppedDonating"
-                          name="whyStoppedDonating"
-                          value={formData.whyStoppedDonating}
-                          onChange={handleInputChange}
-                          placeholder="Detail reasons"
-                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                        />
-                      </div>
+
+                      {formData.previouslyDonated === 'Yes' && (
+                        <>
+                          {/* Last donation date */}
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="lastDonationDate" className="text-neutral-700 font-sans text-sm font-semibold">
+                              When was your last donation?
+                            </label>
+                            <input
+                              type="date"
+                              id="lastDonationDate"
+                              name="lastDonationDate"
+                              value={formData.lastDonationDate}
+                              onChange={handleInputChange}
+                              className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                            />
+                          </div>
+                          {/* Where did you donate */}
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="donationLocation" className="text-neutral-700 font-sans text-sm font-semibold">
+                              Where did you donate?
+                            </label>
+                            <input
+                              type="text"
+                              id="donationLocation"
+                              name="donationLocation"
+                              value={formData.donationLocation}
+                              onChange={handleInputChange}
+                              placeholder="Specify clinic, center, or bank"
+                              className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                            />
+                          </div>
+                          {/* Why did you stop donating */}
+                          <div className="flex flex-col gap-1.5 md:col-span-2">
+                            <label htmlFor="whyStoppedDonating" className="text-neutral-700 font-sans text-sm font-semibold">
+                              Why did you stop donating?
+                            </label>
+                            <input
+                              type="text"
+                              id="whyStoppedDonating"
+                              name="whyStoppedDonating"
+                              value={formData.whyStoppedDonating}
+                              onChange={handleInputChange}
+                              placeholder="Reason for stopping your previous donation"
+                              className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
     
                     {/* Form Actions Footer */}
