@@ -42,6 +42,8 @@ export interface StaffUser {
   email: string;
   role: 'manager' | 'staff';
   status: 'Active' | 'Inactive';
+  password?: string;
+  phone?: string;
 }
 
 export interface AuditLog {
