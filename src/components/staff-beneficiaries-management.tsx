@@ -273,10 +273,10 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
       setBeneficiaries(mappedData.filter((b: any) => b.application_status === 'Approved'));
       // Applicants include Pending AND Rejected, and also Approved if statusFilter is Approved
       setApplicants(mappedData.filter((b: any) => {
-        if (statusFilter === 'Approved') {
-          return b.application_status === 'Approved';
-        }
-        return b.application_status === 'Pending' || b.application_status === 'Rejected';
+        if (statusFilter === 'Approved') return b.application_status === 'Approved';
+        if (statusFilter === 'Pending') return b.application_status === 'Pending';
+        if (statusFilter === 'Rejected') return b.application_status === 'Rejected';
+        return b.application_status === 'Pending' || b.application_status === 'Rejected' || b.application_status === 'Approved';
       }));
     } catch (error) {
       console.error("Failed to fetch beneficiaries:", error);
@@ -296,7 +296,7 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
 
   // Query Filter States
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(mode === 'applicants' ? 'Pending' : 'All');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -306,6 +306,11 @@ export default function StaffBeneficiariesManagement({ mode }: StaffBeneficiarie
   useEffect(() => {
     fetchBeneficiariesData();
   }, [mode, statusFilter]); // Re-fetch when mode or dropdown filter changes
+
+  // Reset status filter when switching mode
+  useEffect(() => {
+    setStatusFilter(mode === 'applicants' ? 'Pending' : 'All');
+  }, [mode]);
 
   // Selected item for Detail Modal
   const [selectedBeneficiary, setSelectedBeneficiary] = useState<Beneficiary | null>(null);

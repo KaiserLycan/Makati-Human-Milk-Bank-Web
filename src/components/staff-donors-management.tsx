@@ -558,7 +558,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
   // Query Filter States
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState(mode === 'applicants' ? 'Pending' : 'All');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [sortBy, setSortBy] = useState<string>('id');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -620,7 +620,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
   // Reset status filter when switching mode
   useEffect(() => {
-    setStatusFilter('All');
+    setStatusFilter(mode === 'applicants' ? 'Pending' : 'All');
   }, [mode]);
 
   useEffect(() => {
@@ -665,12 +665,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
     // Local Status Filter
     if (mode === 'applicants') {
-      if (statusFilter === 'All') {
-        // Show Pending and Rejected when 'All' is selected
-        result = result.filter((d) => 
-          (d as Applicant).application_status === 'Pending' || (d as Applicant).application_status === 'Rejected'
-        );
-      } else {
+      if (statusFilter !== 'All') {
         result = result.filter((d) => 
           (d as Applicant).application_status.toLowerCase() === statusFilter.toLowerCase()
         );
