@@ -2057,6 +2057,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
 
                 {registerTab < 3 ? (
                   <button
+                    key="register-next-btn"
                     type="button"
                     onClick={() => setRegisterTab((t) => Math.min(3, t + 1))}
                     className="px-5 py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all cursor-pointer"
@@ -2066,6 +2067,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                   </button>
                 ) : (
                   <button
+                    key="register-submit-btn"
                     type="submit"
                     className="px-6 py-2.5 text-xs font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all shadow-[0_4px_12px_rgba(0,105,111,0.1)] cursor-pointer"
                     data-testid="register-submit-btn"

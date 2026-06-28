@@ -642,34 +642,43 @@ export default function StaffUsersManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 text-xs font-semibold text-neutral-700">
-                  {users.map((userItem) => (
-                    <tr
-                      key={userItem.id}
-                      onClick={() => {
-                        setSelectedUser(userItem);
-                        setIsEditMode(false);
-                        setIsResetPasswordOpen(false);
-                      }}
-                      className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
-                      data-testid={`row-${userItem.id}`}
-                    >
-                      <td className="px-6 py-4.5 font-bold text-neutral-900">{userItem.name}</td>
-                      <td className="px-6 py-4.5 text-neutral-600">{userItem.email}</td>
-                      <td className="px-6 py-4.5 text-neutral-500 capitalize">{userItem.role}</td>
-                      <td className="px-6 py-4.5 text-center">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(userItem.status)}`}>
-                          {userItem.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {users.length === 0 && (
+                  {isLoading ? (
+                    [...Array(limit || 5)].map((_, i) => (
+                      <tr key={`skel-${i}`} className="animate-pulse pointer-events-none">
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-32"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-48"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
+                        <td className="px-6 py-4.5 text-center flex justify-center"><div className="h-4 bg-slate-200 rounded w-16 my-1"></div></td>
+                      </tr>
+                    ))
+                  ) : users.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-12 text-neutral-400">
-                        {isLoading ? 'Loading users...' : 'No users found.'}
+                      <td colSpan={4} className="text-center py-16 text-neutral-400 font-medium font-sans animate-in fade-in duration-200">
+                        No users found matching your search.
                       </td>
                     </tr>
+                  ) : (
+                    users.map((userItem) => (
+                      <tr
+                        key={userItem.id}
+                        onClick={() => {
+                          setSelectedUser(userItem);
+                          setIsEditMode(false);
+                          setIsResetPasswordOpen(false);
+                        }}
+                        className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
+                        data-testid={`row-${userItem.id}`}
+                      >
+                        <td className="px-6 py-4.5 font-bold text-neutral-900">{userItem.name}</td>
+                        <td className="px-6 py-4.5 text-neutral-600">{userItem.email}</td>
+                        <td className="px-6 py-4.5 text-neutral-500 capitalize">{userItem.role}</td>
+                        <td className="px-6 py-4.5 text-center">
+                          <span className={`px-2.5 py-1 text-[10px] font-bold border rounded-full ${getStatusBadge(userItem.status)}`}>
+                            {userItem.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
