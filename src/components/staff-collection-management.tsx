@@ -118,6 +118,9 @@ export default function StaffCollectionManagement() {
   const [formData, setFormData] = useState<Partial<any>>({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Donor Search State
   const [donorSearchQuery, setDonorSearchQuery] = useState('');
@@ -490,14 +493,17 @@ export default function StaffCollectionManagement() {
 
   const handleDeleteCollection = async () => {
     if (!selectedCollection) return;
-    if (confirm('Are you sure you want to delete this collection? This action cannot be undone.')) {
-      try {
-        await api.delete(`/api/collections/${selectedCollection.ctn}`);
-        setSelectedCollection(null);
-        fetchCollections();
-      } catch (err: any) {
-        alert(err.response?.data?.message || 'Failed to delete collection.');
-      }
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await api.delete(`/api/collections/${selectedCollection.ctn}`);
+      setSelectedCollection(null);
+      setIsDeleteConfirmOpen(false);
+      fetchCollections();
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.message || 'Failed to delete collection.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -589,9 +595,9 @@ export default function StaffCollectionManagement() {
                   min={1}
                   max={100}
                   value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value) || 1)}
+                  onChange={(e) => setLimit(Math.min(Number(e.target.value) || 1, 100))}
                   className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
-                  data-testid="limit-input"
+                  data-testid="limit-select"
                 />
               </div>
             </div>
@@ -733,8 +739,8 @@ export default function StaffCollectionManagement() {
 
                   {!isLoading && pagedItems.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="text-center py-12 text-neutral-400">
-                        No collections found matching current criteria.
+                      <td colSpan={10} className="text-center py-16 text-neutral-400 font-medium font-sans">
+                        No records match the active search and filter settings.
                       </td>
                     </tr>
                   )}
@@ -744,15 +750,15 @@ export default function StaffCollectionManagement() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
+              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500 font-sans">
                 <span>
                   Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries
                 </span>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     data-testid="prev-page-btn"
                   >
                     <ChevronLeft className="size-4" />
@@ -760,7 +766,7 @@ export default function StaffCollectionManagement() {
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     data-testid="next-page-btn"
                   >
                     <ChevronRight className="size-4" />
@@ -855,8 +861,8 @@ export default function StaffCollectionManagement() {
       {/* COLLECTION DETAILS MODAL */}
       {selectedCollection && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm transition-all duration-300" data-testid="detail-modal">
-          <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50">
+          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col relative">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-100 bg-slate-50/50 rounded-t-3xl">
               <h3 className="text-xl font-black text-neutral-900 flex items-center gap-2">
                 <ClipboardList className="size-6 text-brand-teal" />
                 Collection Details
@@ -870,168 +876,176 @@ export default function StaffCollectionManagement() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-6">
-              <div className="grid grid-cols-2 gap-5 items-center">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Milk Status</label>
-                  <div className="relative inline-block w-[140px]">
-                    {selectedCollection.pid ? (
-                      <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getMilkStatusBadge(selectedCollection.milk_status)}`}>
-                        {selectedCollection.milk_status}
-                      </span>
-                    ) : (
-                      <CustomDropdown
-                        disabled={isUpdatingStatus}
-                        triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getMilkStatusBadge(selectedCollection.milk_status)}`}
-                        dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
-                        optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
-                        value={selectedCollection.milk_status}
-                        onChange={(val: string) => handleUpdateMilkStatus(selectedCollection.ctn, val)}
-                        options={[
-                          { value: 'good', label: 'Good' },
-                          { value: 'contaminated', label: 'Contaminated' },
-                          { value: 'discarded', label: 'Discarded' },
-                          { value: 'expired', label: 'Expired' }
-                        ]}
-                      />
-                    )}
-                  </div>
-                </div>
+            <div className="p-6 space-y-6">
 
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">QAT Status</label>
-                  <div className="relative inline-block w-[140px]">
-                    {selectedCollection.pid ? (
-                      <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getQATStatusBadge(selectedCollection.qat_status)}`}>
-                        {selectedCollection.qat_status}
-                      </span>
-                    ) : (
-                      <CustomDropdown
-                        disabled={isUpdatingStatus}
-                        triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getQATStatusBadge(selectedCollection.qat_status)}`}
-                        dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
-                        optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
-                        value={selectedCollection.qat_status}
-                        onChange={(val: string) => handleUpdateQATStatus(selectedCollection.ctn, val)}
-                        options={[
-                          { value: 'pending', label: 'Pending' },
-                          { value: 'pass', label: 'Pass' },
-                          { value: 'fail', label: 'Fail' }
-                        ]}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {selectedCollection.pid && (
+              {/* Contextual Pooled To Alert - matching completely processed design */}
+              {selectedCollection.pid && (
+                <div className="p-4 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-semibold rounded-2xl flex items-start gap-3" data-testid="collection-pooled-alert">
+                  <Info className="size-5 shrink-0" />
                   <div>
-                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Pooled To</label>
-                    <span className="px-2.5 py-1 text-[10px] font-bold border rounded-full bg-blue-50 text-blue-700 border-blue-100 uppercase tracking-wider">
-                      {selectedCollection.pid}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <hr className="border-neutral-100" />
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Donor Name</label>
-                  <div className="text-sm font-bold text-neutral-800 break-words" data-testid="modal-donor-name">
-                    {selectedCollection.donor?.name || `DTN: ${selectedCollection.donor?.dtn}`}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Collection ID</label>
-                  <div className="text-sm font-bold text-neutral-800" data-testid="modal-collection-id">{selectedCollection.ctn}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Program</label>
-                  <div className="text-sm font-bold text-neutral-800">{selectedCollection.program}</div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Volume</label>
-                  <div className="text-sm font-bold text-neutral-800" data-testid="modal-expected">{selectedCollection.volume_ml} mL</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Date Collected</label>
-                  <div className="text-sm font-bold text-neutral-800" data-testid="modal-date">
-                    {selectedCollection.collection_date ? new Date(selectedCollection.collection_date).toLocaleDateString() : 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Collected By</label>
-                  <div className="text-sm font-bold text-neutral-800 truncate" title={selectedCollection.collected_by_user?.name}>
-                    {selectedCollection.collected_by_user?.name || 'Unknown'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Expiration Date</label>
-                  <div className="text-sm font-bold text-neutral-800">
-                    {selectedCollection.expiration_date ? new Date(selectedCollection.expiration_date).toLocaleDateString() : 'N/A'}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Pickup Date</label>
-                  <div className="text-sm font-bold text-neutral-800">
-                    {selectedCollection.pickup_date ? new Date(selectedCollection.pickup_date).toLocaleDateString() : 'N/A'}
-                  </div>
-                </div>
-              </div>
-
-              {(selectedCollection.program === 'MW' || selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
-                <div className="grid grid-cols-2 gap-5">
-                  {selectedCollection.program === 'MW' && (
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Hospital</label>
-                      <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.hospital || 'N/A'}</div>
-                    </div>
-                  )}
-                  {(selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Health Center</label>
-                      <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.health_center || 'N/A'}</div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedCollection.remarks && (
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Remarks</label>
-                  <div className="text-sm font-bold text-neutral-800 break-words">
-                    {selectedCollection.remarks}
+                    <p className="font-bold">Pooled</p>
+                    <p className="mt-0.5 opacity-90">This collection is pooled and assigned to PID {selectedCollection.pid}.</p>
                   </div>
                 </div>
               )}
+
+              {/* Two Column Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left Column: Details */}
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">ID</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-collection-id">{selectedCollection.ctn}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Donor Name</label>
+                      <div className="text-sm font-bold text-neutral-800 break-words" data-testid="modal-donor-name">
+                        {selectedCollection.donor?.name || `DTN: ${selectedCollection.donor?.dtn}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Program</label>
+                      <div className="text-sm font-bold text-neutral-800">{selectedCollection.program}</div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Volume</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-expected">{selectedCollection.volume_ml} mL</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Date Collected</label>
+                      <div className="text-sm font-bold text-neutral-800" data-testid="modal-date">
+                        {selectedCollection.collection_date ? new Date(selectedCollection.collection_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Collected By</label>
+                      <div className="text-sm font-bold text-neutral-800 truncate" title={selectedCollection.collected_by_user?.name}>
+                        {selectedCollection.collected_by_user?.name || 'Unknown'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Expiration Date</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedCollection.expiration_date ? new Date(selectedCollection.expiration_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Pickup Date</label>
+                      <div className="text-sm font-bold text-neutral-800">
+                        {selectedCollection.pickup_date ? new Date(selectedCollection.pickup_date).toLocaleDateString() : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {(selectedCollection.program === 'MW' || selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
+                    <div className="grid grid-cols-2 gap-5">
+                      {selectedCollection.program === 'MW' && (
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Hospital</label>
+                          <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.hospital || 'N/A'}</div>
+                        </div>
+                      )}
+                      {(selectedCollection.program === 'MA' || selectedCollection.program === 'ST') && (
+                        <div>
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Health Center</label>
+                          <div className="text-sm font-bold text-neutral-800 truncate">{selectedCollection.health_center || 'N/A'}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedCollection.remarks && (
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Remarks</label>
+                      <div className="text-sm font-bold text-neutral-800 break-words">
+                        {selectedCollection.remarks}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Status / QC Dropdowns */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">Milk Status</label>
+                    <div className="relative w-full">
+                      {selectedCollection.pid ? (
+                        <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getMilkStatusBadge(selectedCollection.milk_status)}`}>
+                          {selectedCollection.milk_status}
+                        </span>
+                      ) : (
+                        <CustomDropdown
+                          disabled={isUpdatingStatus}
+                          triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getMilkStatusBadge(selectedCollection.milk_status)}`}
+                          dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
+                          optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
+                          value={selectedCollection.milk_status}
+                          onChange={(val: string) => handleUpdateMilkStatus(selectedCollection.ctn, val)}
+                          options={[
+                            { value: 'good', label: 'Good' },
+                            { value: 'contaminated', label: 'Contaminated' },
+                            { value: 'discarded', label: 'Discarded' },
+                            { value: 'expired', label: 'Expired' }
+                          ]}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2">QAT Status</label>
+                    <div className="relative w-full">
+                      {selectedCollection.pid ? (
+                        <span className={`flex w-full justify-center px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider ${getQATStatusBadge(selectedCollection.qat_status)}`}>
+                          {selectedCollection.qat_status}
+                        </span>
+                      ) : (
+                        <CustomDropdown
+                          disabled={isUpdatingStatus}
+                          triggerClassName={`px-3 py-1.5 text-[10px] font-bold border rounded-full uppercase tracking-wider shadow-sm transition-colors w-full ${getQATStatusBadge(selectedCollection.qat_status)}`}
+                          dropdownClassName="!min-w-[140px] w-full rounded-2xl border-neutral-100 shadow-xl p-1.5"
+                          optionClassName="uppercase text-[10px] tracking-wider py-2 px-2 text-center rounded-xl"
+                          value={selectedCollection.qat_status}
+                          onChange={(val: string) => handleUpdateQATStatus(selectedCollection.ctn, val)}
+                          options={[
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'pass', label: 'Pass' },
+                            { value: 'fail', label: 'Fail' }
+                          ]}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50">
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50 rounded-b-3xl items-center">
               <button
-                onClick={handleDeleteCollection}
-                className="px-6 py-3 text-red-600 hover:bg-red-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                onClick={() => { setDeleteError(''); setIsDeleteConfirmOpen(true); }}
+                className="px-4 py-2.5 text-red-650 hover:text-red-750 font-bold text-sm rounded-xl hover:bg-red-50/50 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="size-4" /> Delete
               </button>
               <button
                 onClick={handleOpenEditForm}
-                className="px-6 py-3 text-brand-teal hover:bg-brand-teal/10 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 text-brand-teal hover:text-brand-teal-darker font-bold text-sm rounded-xl hover:bg-brand-teal/5 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Edit2 className="size-4" /> Edit
               </button>
               <button
                 onClick={() => setSelectedCollection(null)}
-                className="px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-xl transition-colors ml-2 shadow-lg shadow-neutral-900/20"
+                className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-850 text-white font-bold text-sm rounded-xl ml-2 shadow-sm transition-all cursor-pointer"
               >
                 Done
               </button>
@@ -1238,6 +1252,67 @@ export default function StaffCollectionManagement() {
                 )}
                 {formMode === 'add' ? 'Submit Collection' : 'Save Changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* DELETE CONFIRMATION MODAL */}
+      {isDeleteConfirmOpen && selectedCollection && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-sm relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Trash2 className="size-5 text-red-500" />
+                <h3 className="text-base font-bold text-neutral-900">
+                  Confirm Delete
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                disabled={isDeleting}
+                className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all disabled:opacity-50"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-neutral-600 leading-relaxed">
+                Are you sure you want to delete collection CTN #{selectedCollection.ctn}? This action cannot be undone and will erase it from the database.
+              </p>
+
+              {deleteError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium animate-in fade-in duration-200">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  disabled={isDeleting}
+                  className="flex-1 h-11 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleDeleteCollection}
+                  disabled={isDeleting}
+                  className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <span>Delete</span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

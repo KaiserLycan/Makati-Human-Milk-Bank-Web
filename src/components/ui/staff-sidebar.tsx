@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -65,6 +65,33 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     email: 'staff@mhmb.gov',
     role: 'manager',
   });
+
+  const [profileMode, setProfileMode] = useState<'view' | 'edit' | 'password'>('view');
+  const [editForm, setEditForm] = useState({ name: '', phone: '', email: '' });
+  const [passwordForm, setPasswordForm] = useState({ old_password: '', new_password: '', confirm_password: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalSuccess, setModalSuccess] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isProfileOpen && profile) {
+      setEditForm({
+        name: profile.name || '',
+        phone: profile.phone || '',
+        email: profile.email || '',
+      });
+      setPasswordForm({ old_password: '', new_password: '', confirm_password: '' });
+      setProfileMode('view');
+      setModalError(null);
+      setModalSuccess(null);
+      setSelectedImageFile(null);
+      setSelectedImagePreview(null);
+    }
+  }, [isProfileOpen, profile]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';
@@ -136,6 +163,106 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleUpdateProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setModalError(null);
+    setModalSuccess(null);
+
+    if (!editForm.name.trim()) {
+      setModalError('Name is required.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!editForm.phone.trim()) {
+      setModalError('Phone number is required.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!/^\+[1-9]\d{1,14}$/.test(editForm.phone.trim())) {
+      setModalError('Phone number must use E164 format (e.g. +639629518812).');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('name', editForm.name);
+      formData.append('email', editForm.email);
+      formData.append('phone', editForm.phone);
+      if (selectedImageFile) {
+        formData.append('profile_image_url', selectedImageFile);
+      } else if (profile.profile_image_url) {
+        formData.append('profile_image_url', profile.profile_image_url);
+      }
+
+      const response = await api.put(`/api/users/${profile.id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const user = response.data.data;
+      if (user) {
+        const updated: UserProfile = {
+          ...profile,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          profile_image_url: user.profile_image_url,
+        };
+        setProfile(updated);
+        saveProfile(updated);
+        setModalSuccess('Profile updated successfully!');
+        setSelectedImageFile(null);
+        setSelectedImagePreview(null);
+        setProfileMode('view');
+      }
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      setModalError(err.response?.data?.message || err.response?.data?.error || 'Failed to update profile.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setModalError(null);
+    setModalSuccess(null);
+
+    if (!passwordForm.old_password) {
+      setModalError('Current password is required.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (passwordForm.new_password.length < 8) {
+      setModalError('New password must be at least 8 characters.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setModalError('New passwords do not match.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      await api.patch('/api/users/change-password', {
+        old_password: passwordForm.old_password,
+        new_password: passwordForm.new_password,
+      });
+      setModalSuccess('Password changed successfully!');
+      setProfileMode('view');
+    } catch (err: any) {
+      console.error('Failed to change password:', err);
+      setModalError(err.response?.data?.message || err.response?.data?.error || 'Failed to change password.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleRoleChange = (role: 'manager' | 'staff') => {
     const updated = { ...profile, role };
     setProfile(updated);
@@ -153,13 +280,18 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
     setLogoutError(null);
     try{
       localStorage.removeItem('mhmb_logged_in');
+      localStorage.removeItem('mhmb_profile');
       await api.post('/api/auth/logout');
       router.push('/work');
     } catch (err: any){
-      setLogoutError(
-        err?.response?.data?.error || 'Logout failed. Please Try Again.'
-      );
-      setIsLoggingOut(false);
+      if (err?.response?.status === 401) {
+        router.push('/work');
+      } else {
+        setLogoutError(
+          err?.response?.data?.error || 'Logout failed. Please Try Again.'
+        );
+        setIsLoggingOut(false);
+      }
     }
   };
 
@@ -306,7 +438,7 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 space-y-4 bg-neutral-50 border-t border-neutral-100 shrink-0">
+        <div className="p-4 space-y-4 bg-white border-t border-neutral-100 shrink-0">
           {showSidebarNotification && (
             <div
               className="bg-cyan-50 border border-cyan-100 rounded-xl p-3.5 flex gap-3 text-neutral-900 transition-all duration-300 animate-out fade-out"
@@ -372,8 +504,16 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
           <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-md relative animate-in fade-in zoom-in-95 duration-200 flex flex-col overflow-hidden">
             <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <User className="size-5 text-brand-teal" />
-                <h3 className="text-lg font-bold text-neutral-900">Profile</h3>
+                {profileMode === 'view' ? (
+                  <User className="size-5 text-brand-teal" />
+                ) : profileMode === 'edit' ? (
+                  <User className="size-5 text-brand-teal" />
+                ) : (
+                  <Shield className="size-5 text-brand-teal" />
+                )}
+                <h3 className="text-lg font-bold text-neutral-900">
+                  {profileMode === 'view' ? 'Profile' : profileMode === 'edit' ? 'Update Profile' : 'Change Password'}
+                </h3>
               </div>
               <button
                 onClick={() => setIsProfileOpen(false)}
@@ -385,63 +525,244 @@ export default function StaffSidebar({ activeItem }: StaffSidebarProps) {
               </button>
             </div>
 
-            <div className="p-8 flex flex-col items-center text-center space-y-6">
-              {profile?.profile_image_url ? (
-                <img
-                  src={profile.profile_image_url}
-                  alt={profile.name || 'User Profile'}
-                  className="size-28 rounded-full object-cover border border-neutral-200 shadow-inner"
-                  data-testid="profile-modal-avatar"
-                />
-              ) : (
-                <div className="size-28 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
-                  {getInitials(profile?.name)}
-                </div>
-              )}
+            {profileMode === 'view' ? (
+              <div className="p-8 flex flex-col items-center text-center space-y-6">
+                {profile?.profile_image_url ? (
+                  <img
+                    src={profile.profile_image_url}
+                    alt={profile.name || 'User Profile'}
+                    className="size-28 rounded-full object-cover border border-neutral-200 shadow-inner"
+                    data-testid="profile-modal-avatar"
+                  />
+                ) : (
+                  <div className="size-28 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner">
+                    {getInitials(profile?.name)}
+                  </div>
+                )}
 
-              <div className="space-y-1.5 w-full">
-                <h4 className="font-bold text-neutral-950 text-lg" data-testid="profile-modal-name">
-                  {profile?.name}
-                </h4>
-                <p className="text-xs text-neutral-400 font-medium">Employee ID: {profile?.id}</p>
+                <div className="space-y-1.5 w-full">
+                  <h4 className="font-bold text-neutral-950 text-lg" data-testid="profile-modal-name">
+                    {profile?.name}
+                  </h4>
+                  <p className="text-xs text-neutral-400 font-medium">Employee ID: {profile?.id}</p>
+                </div>
+
+                <hr className="w-full border-neutral-100" />
+
+                {modalSuccess && (
+                  <div className="w-full bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-xs font-semibold">
+                    {modalSuccess}
+                  </div>
+                )}
+
+                <div className="w-full text-left space-y-3.5 text-xs">
+                  <div className="flex items-center gap-3.5">
+                    <Mail className="size-4 text-neutral-400" />
+                    <div>
+                      <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Email Address</p>
+                      <p className="font-bold text-neutral-800">{profile?.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3.5">
+                    <Phone className="size-4 text-neutral-400" />
+                    <div>
+                      <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Phone Number</p>
+                      <p className="font-bold text-neutral-800">{profile?.phone || 'Not Provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3.5">
+                    <Calendar className="size-4 text-neutral-400" />
+                    <div>
+                      <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Joined Date</p>
+                      <p className="font-bold text-neutral-800">{getJoinedDate()}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3.5">
+                    <Shield className="size-4 text-neutral-400" />
+                    <div className="flex-1">
+                      <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Role Access Level</p>
+                      <p className="font-bold text-neutral-800 capitalize mt-0.5">{profile?.role}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <hr className="w-full border-neutral-100" />
+
+                <div className="w-full flex flex-col gap-2.5">
+                  <button
+                    onClick={() => { setProfileMode('edit'); setModalError(null); setModalSuccess(null); }}
+                    className="w-full py-2.5 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm text-center cursor-pointer"
+                  >
+                    Update Profile Info
+                  </button>
+                  <button
+                    onClick={() => { setProfileMode('password'); setModalError(null); setModalSuccess(null); }}
+                    className="w-full py-2.5 text-xs font-bold text-neutral-700 hover:text-brand-teal bg-white border border-neutral-200 hover:border-brand-teal/30 hover:bg-brand-teal/5 rounded-xl transition-all shadow-sm text-center cursor-pointer"
+                  >
+                    Change Password
+                  </button>
+                </div>
               </div>
+            ) : profileMode === 'edit' ? (
+              <form onSubmit={handleUpdateProfileSubmit} className="p-8 space-y-6">
+                {modalError && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium">
+                    {modalError}
+                  </div>
+                )}
 
-              <hr className="w-full border-neutral-100" />
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                    {selectedImagePreview || profile?.profile_image_url ? (
+                      <img
+                        src={selectedImagePreview || profile?.profile_image_url || ''}
+                        alt="User Profile Preview"
+                        className="size-28 rounded-full object-cover border border-neutral-200 shadow-inner group-hover:opacity-75 transition-opacity"
+                      />
+                    ) : (
+                      <div className="size-28 rounded-full bg-slate-100 flex items-center justify-center font-bold text-neutral-700 text-3xl border border-neutral-200 select-none shadow-inner group-hover:bg-neutral-200 transition-colors">
+                        {getInitials(profile?.name)}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-neutral-900/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <span className="text-white text-xs font-bold font-sans">Change Image</span>
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setSelectedImageFile(file);
+                        setSelectedImagePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                </div>
 
-              <div className="w-full text-left space-y-3.5 text-xs">
-                <div className="flex items-center gap-3.5">
-                  <Mail className="size-4 text-neutral-400" />
-                  <div>
-                    <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Email Address</p>
-                    <p className="font-bold text-neutral-800">{profile?.email}</p>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-500 block">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-500 block">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-500 block">Phone Number</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="+639629518812"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                    />
+                    <p className="text-[10px] text-neutral-400 font-semibold">Must start with + and country code (E164 format).</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3.5">
-                  <Phone className="size-4 text-neutral-400" />
-                  <div>
-                    <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Phone Number</p>
-                    <p className="font-bold text-neutral-800">{profile?.phone || 'Not Provided'}</p>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => { setProfileMode('view'); setModalError(null); }}
+                    className="flex-1 h-11 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 h-11 rounded-xl bg-brand-teal hover:bg-brand-teal-darker text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSubmitting ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleChangePasswordSubmit} className="p-8 space-y-6">
+                {modalError && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium">
+                    {modalError}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-500 block">Current Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={passwordForm.old_password}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, old_password: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-500 block">New Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={passwordForm.new_password}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-neutral-500 block">Confirm New Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={passwordForm.confirm_password}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                      className="w-full border border-neutral-200 bg-slate-50/50 hover:bg-slate-50 focus:bg-white rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/20 transition-all font-medium text-neutral-800 text-sm"
+                    />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3.5">
-                  <Calendar className="size-4 text-neutral-400" />
-                  <div>
-                    <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Joined Date</p>
-                    <p className="font-bold text-neutral-800">{getJoinedDate()}</p>
-                  </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => { setProfileMode('view'); setModalError(null); }}
+                    className="flex-1 h-11 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 h-11 rounded-xl bg-brand-teal hover:bg-brand-teal-darker text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSubmitting ? 'Updating...' : 'Update Password'}
+                  </button>
                 </div>
-
-                <div className="flex items-center gap-3.5">
-                  <Shield className="size-4 text-neutral-400" />
-                  <div className="flex-1">
-                    <p className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">Role Access Level</p>
-                    <p className="font-bold text-neutral-800 capitalize mt-0.5">{profile?.role}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+              </form>
+            )}
           </div>
         </div>
       )}

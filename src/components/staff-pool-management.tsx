@@ -108,6 +108,9 @@ export default function StaffPoolManagement() {
   // Selection & Modal State
   const [selectedPool, setSelectedPool] = useState<PoolMilkBatch | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Edit Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -226,14 +229,17 @@ export default function StaffPoolManagement() {
 
   const handleDeletePool = async () => {
     if (!selectedPool) return;
-    if (confirm('Are you sure you want to delete this milk pool? This action cannot be undone.')) {
-      try {
-        await api.delete(`/api/pooling/${selectedPool.pid}`);
-        setSelectedPool(null);
-        fetchPools();
-      } catch (err: any) {
-        alert(err.response?.data?.message || 'Failed to delete milk pool.');
-      }
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      await api.delete(`/api/pooling/${selectedPool.pid}`);
+      setSelectedPool(null);
+      setIsDeleteConfirmOpen(false);
+      fetchPools();
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.message || 'Failed to delete milk pool.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -378,16 +384,15 @@ export default function StaffPoolManagement() {
               {/* Limit Selector */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-neutral-400">Show:</span>
-                <select
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
                   value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value))}
-                  className="text-xs font-bold text-neutral-600 bg-slate-50 hover:bg-slate-100 border border-neutral-200 rounded-xl px-2.5 py-2.5 cursor-pointer outline-none focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal transition-all"
+                  onChange={(e) => setLimit(Math.min(Number(e.target.value) || 1, 100))}
+                  className="w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-teal/15 transition-all text-center"
                   data-testid="limit-select"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
+                />
               </div>
             </div>
           </div>
@@ -399,7 +404,7 @@ export default function StaffPoolManagement() {
                 <thead>
                   <tr className="border-b border-neutral-100 bg-neutral-50/50 text-[11px] font-bold text-neutral-400 uppercase tracking-widest select-none">
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('id')} data-testid="th-id">
-                      PID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                      ID {sortBy === 'id' && (sortOrder === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-6 py-4 cursor-pointer hover:text-brand-teal text-left" onClick={() => handleSort('datePooled')} data-testid="th-date">
                       Date Pooled {sortBy === 'datePooled' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -461,8 +466,8 @@ export default function StaffPoolManagement() {
 
                   {!isLoading && pagedItems.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-neutral-400">
-                        No pooled batches found matching current criteria.
+                      <td colSpan={6} className="text-center py-16 text-neutral-400 font-medium font-sans">
+                        No records match the active search and filter settings.
                       </td>
                     </tr>
                   )}
@@ -472,15 +477,15 @@ export default function StaffPoolManagement() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
+              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500 font-sans">
                 <span>
                   Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems} entries
                 </span>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     data-testid="prev-page-btn"
                   >
                     <ChevronLeft className="size-4" />
@@ -488,7 +493,7 @@ export default function StaffPoolManagement() {
                   <button
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     data-testid="next-page-btn"
                   >
                     <ChevronRight className="size-4" />
@@ -543,7 +548,7 @@ export default function StaffPoolManagement() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">PID</label>
+                      <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">ID</label>
                       <div className="text-sm font-bold text-neutral-800" data-testid="modal-batch-id">{selectedPool.pid}</div>
                     </div>
                     <div>
@@ -644,23 +649,23 @@ export default function StaffPoolManagement() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50">
+            <div className="p-6 border-t border-neutral-100 flex gap-3 justify-end bg-slate-50/50 items-center">
               <button
-                onClick={handleDeletePool}
-                className="px-6 py-3 text-red-600 hover:bg-red-50 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                onClick={() => { setDeleteError(''); setIsDeleteConfirmOpen(true); }}
+                className="px-4 py-2.5 text-red-655 hover:text-red-755 font-bold text-sm rounded-xl hover:bg-red-50/50 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Trash2 className="size-4" /> Delete
               </button>
               <button
                 onClick={handleOpenEditForm}
-                className="px-6 py-3 text-brand-teal hover:bg-brand-teal/10 font-bold text-sm rounded-xl transition-colors flex items-center gap-2"
+                className="px-4 py-2.5 text-brand-teal hover:text-brand-teal-darker font-bold text-sm rounded-xl hover:bg-brand-teal/5 transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <Edit2 className="size-4" /> Edit
               </button>
               {selectedPool.milk_status === 'good' && Number(selectedPool.remaining_volume_ml) > 0 && (
                 <button
                   onClick={handleOpenPasteurizeForm}
-                  className="px-6 py-3 text-white bg-brand-teal hover:bg-brand-teal/90 font-bold text-sm rounded-xl transition-colors flex items-center gap-2 shadow-lg shadow-brand-teal/20"
+                  className="px-6 py-2.5 text-white bg-brand-teal hover:bg-brand-teal/90 font-bold text-sm rounded-xl transition-all flex items-center gap-2 shadow-sm cursor-pointer"
                   data-testid="modal-pasteurize-btn"
                 >
                   <Sparkles className="size-4" /> Pasteurize
@@ -668,7 +673,7 @@ export default function StaffPoolManagement() {
               )}
               <button
                 onClick={() => setSelectedPool(null)}
-                className="px-6 py-3 bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-sm rounded-xl transition-colors ml-2 shadow-lg shadow-neutral-900/20"
+                className="px-6 py-2.5 bg-neutral-900 hover:bg-neutral-850 text-white font-bold text-sm rounded-xl ml-2 shadow-sm transition-all cursor-pointer"
                 data-testid="close-modal-btn"
               >
                 Done
@@ -852,6 +857,67 @@ export default function StaffPoolManagement() {
                 )}
                 Confirm Pasteurization
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* DELETE CONFIRMATION MODAL */}
+      {isDeleteConfirmOpen && selectedPool && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl border border-neutral-200 shadow-2xl w-full max-w-sm relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Trash2 className="size-5 text-red-500" />
+                <h3 className="text-base font-bold text-neutral-900">
+                  Confirm Delete
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                disabled={isDeleting}
+                className="text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 p-2 rounded-xl transition-all disabled:opacity-50"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-neutral-600 leading-relaxed">
+                Are you sure you want to delete milk pool Batch #{selectedPool.pid}? This action cannot be undone and will erase it from the database.
+              </p>
+
+              {deleteError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3 text-xs font-medium animate-in fade-in duration-200">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  disabled={isDeleting}
+                  className="flex-1 h-11 rounded-xl border border-neutral-200 text-neutral-700 text-sm font-semibold hover:bg-neutral-50 transition-all disabled:opacity-50"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleDeletePool}
+                  disabled={isDeleting}
+                  className="flex-1 h-11 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <span>Delete</span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -141,6 +141,7 @@ export default function StaffAuditsManagement() {
     return options;
   };
 
+
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
@@ -153,13 +154,13 @@ export default function StaffAuditsManagement() {
       try {
         setIsLoading(true);
         setError(null);
-        
+
         let start_date = undefined;
         let end_date = undefined;
 
         if (filterYear || filterMonth) {
           const y = filterYear ? Number(filterYear) : new Date().getFullYear();
-          
+
           if (filterMonth) {
             const m = Number(filterMonth);
             start_date = new Date(y, m - 1, 1).toISOString();
@@ -184,17 +185,17 @@ export default function StaffAuditsManagement() {
             end_date: end_date
           }
         });
-        
+
         const fetchedData = response.data?.data?.data || [];
         const meta = response.data?.data?.meta;
 
         setAudits(Array.isArray(fetchedData) ? fetchedData : []);
-        
+
         if (meta) {
           setServerTotalItems(meta.total || 0);
           setServerTotalPages(meta.totalPages || 1);
         }
-        
+
       } catch (err: any) {
         setError(err?.response?.data?.error || 'Failed to load audit logs.');
         setAudits([]);
@@ -374,7 +375,7 @@ export default function StaffAuditsManagement() {
                 className={`w-16 text-xs font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-xl px-3 py-2.5 outline-none transition-all text-center ${
                   limitWarning ? 'ring-2 ring-red-500/50 bg-red-50 text-red-600' : 'focus:ring-2 focus:ring-brand-teal/15 focus:border-brand-teal'
                 }`}
-                data-testid="limit-input"
+                data-testid="limit-select"
               />
               {limitWarning && (
                 <div className="absolute -top-10 right-0 bg-red-50 border border-red-200 text-red-600 text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap animate-in fade-in slide-in-from-bottom-2 z-10 pointer-events-none">
@@ -414,16 +415,18 @@ export default function StaffAuditsManagement() {
                   {isLoading ? (
                     [...Array(limit || 5)].map((_, i) => (
                       <tr key={`skel-${i}`} className="animate-pulse pointer-events-none">
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-32"></div></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-48"></div></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
-                        <td className="px-6 py-4"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-12"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-32"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-48"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-20"></div></td>
+                        <td className="px-6 py-4.5"><div className="h-4 bg-slate-200 rounded w-24"></div></td>
                       </tr>
                     ))
                   ) : audits.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-neutral-400">No audit records found matching your filters.</td>
+                      <td colSpan={5} className="text-center py-16 text-neutral-400 font-medium font-sans animate-in fade-in duration-200">
+                        No audit records found matching your filters.
+                      </td>
                     </tr>
                   ) : (
                     audits.map((audit) => (
@@ -431,12 +434,15 @@ export default function StaffAuditsManagement() {
                         key={audit.log_id}
                         onClick={() => setSelectedAudit(audit)}
                         className="hover:bg-slate-50/70 active:bg-slate-100/50 cursor-pointer transition-colors duration-150"
+                        data-testid={`row-${audit.log_id}`}
                       >
-                        <td className="px-6 py-4 font-bold text-neutral-900">{audit.log_id}</td>
-                        <td className="px-6 py-4 text-neutral-500">{new Date(audit.performed_at).toLocaleString()}</td>
-                        <td className="px-6 py-4 font-bold text-neutral-900">{audit.user?.name ?? audit.modified_by}</td>
-                        <td className="px-6 py-4 text-neutral-800 font-bold">{audit.action_performed}</td>
-                        <td className="px-6 py-4 text-neutral-500 font-normal truncate max-w-[200px]">{audit.table_name}</td>
+                        <td className="px-6 py-4.5 font-bold text-neutral-900">{audit.log_id}</td>
+                        <td className="px-6 py-4.5 font-bold text-neutral-500 font-mono">
+                          {new Date(audit.performed_at).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4.5 text-neutral-600">{audit.user?.name ?? audit.modified_by}</td>
+                        <td className="px-6 py-4.5 text-neutral-900 font-bold">{audit.action_performed}</td>
+                        <td className="px-6 py-4.5 text-neutral-500 font-normal truncate max-w-[200px]">{audit.table_name}</td>
                       </tr>
                     ))
                   )}
@@ -444,23 +450,26 @@ export default function StaffAuditsManagement() {
               </table>
             </div>
 
+            {/* Pagination Controls */}
             {!isLoading && serverTotalPages > 1 && (
-              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500">
+              <div className="bg-white border-t border-neutral-100 px-8 py-4 flex items-center justify-between text-xs font-semibold text-neutral-500 font-sans">
                 <span>
                   Showing {(page - 1) * limit + 1} to {Math.min(page * limit, serverTotalItems)} of {serverTotalItems} total entries
                 </span>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="prev-page-btn"
                   >
                     <ChevronLeft className="size-4" />
                   </button>
                   <button
                     disabled={page === serverTotalPages}
                     onClick={() => setPage(page + 1)}
-                    className="p-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="p-2 rounded-xl border border-neutral-200 hover:bg-neutral-50 active:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    data-testid="next-page-btn"
                   >
                     <ChevronRight className="size-4" />
                   </button>
