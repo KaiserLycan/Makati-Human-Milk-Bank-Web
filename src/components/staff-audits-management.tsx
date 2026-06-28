@@ -141,6 +141,19 @@ export default function StaffAuditsManagement() {
     return options;
   };
 
+  const formatJSON = (data: any): string => {
+    if (!data) return '';
+    try {
+      if (typeof data === 'string') {
+        const parsed = JSON.parse(data);
+        return JSON.stringify(parsed, null, 2);
+      }
+      return JSON.stringify(data, null, 2);
+    } catch {
+      return String(data);
+    }
+  };
+
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -532,7 +545,7 @@ export default function StaffAuditsManagement() {
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Old Data</label>
                     <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto">
-                      {JSON.stringify(selectedAudit.old_data, null, 2)}
+                      {formatJSON(selectedAudit.old_data)}
                     </pre>
                   </div>
                 )}
@@ -541,7 +554,7 @@ export default function StaffAuditsManagement() {
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">New Data</label>
                     <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto">
-                      {JSON.stringify(selectedAudit.new_data, null, 2)}
+                      {formatJSON(selectedAudit.new_data)}
                     </pre>
                   </div>
                 )}
