@@ -10,6 +10,9 @@ export interface DonorApplicationProps {
 }
 
 export default function DonorApplication({ onSubmitSuccess }: DonorApplicationProps) {
+  // Active Tab State
+  const [registerTab, setRegisterTab] = useState(1);
+
   // Form State
   const [formData, setFormData] = useState({
     // Personal Info
@@ -287,456 +290,519 @@ export default function DonorApplication({ onSubmitSuccess }: DonorApplicationPr
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-12">
+            <>
+              {/* Stepper Tabs */}
+              <div className="bg-slate-50 border border-neutral-100 rounded-2xl px-6 py-2.5 flex gap-2 overflow-x-auto shrink-0 select-none mb-8">
+                {[
+                  { tab: 1, label: '1. Personal & Contact' },
+                  { tab: 2, label: '2. Travel & Donation' },
+                  { tab: 3, label: '3. Medical History' },
+                ].map((item) => (
+                  <button
+                    key={item.tab}
+                    type="button"
+                    onClick={() => setRegisterTab(item.tab)}
+                    className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${registerTab === item.tab
+                      ? 'bg-brand-teal text-white shadow-sm'
+                      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'
+                      }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-12">
               
-              {/* SECTION 1: Personal Information */}
-              <fieldset className="space-y-6">
-                <legend className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
-                  Personal Information
-                </legend>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
-                  {/* First Name */}
-                  <div className="sm:col-span-3 flex flex-col gap-1.5">
-                    <label htmlFor="firstName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      First Name
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      id="firstName"
-                      name="firstName"
-                      value={formData.firstName}
-                      onChange={handleInputChange}
-                      placeholder="Juana Josefina Leonora"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Middle Name */}
-                  <div className="sm:col-span-3 flex flex-col gap-1.5">
-                    <label htmlFor="middleName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Middle Name
-                    </label>
-                    <input
-                      type="text"
-                      id="middleName"
-                      name="middleName"
-                      value={formData.middleName}
-                      onChange={handleInputChange}
-                      placeholder="Santos"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Last Name */}
-                  <div className="sm:col-span-3 flex flex-col gap-1.5">
-                    <label htmlFor="lastName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Last Name
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      id="lastName"
-                      name="lastName"
-                      value={formData.lastName}
-                      onChange={handleInputChange}
-                      placeholder="Dela Cruz"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Suffix */}
-                  <div className="sm:col-span-3 flex flex-col gap-1.5">
-                    <label htmlFor="suffix" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Suffix
-                    </label>
-                    <select
-                      id="suffix"
-                      name="suffix"
-                      value={formData.suffix}
-                      onChange={handleInputChange}
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    >
-                      <option value="">None</option>
-                      <option value="Jr.">Jr.</option>
-                      <option value="Sr.">Sr.</option>
-                      <option value="II">II</option>
-                      <option value="III">III</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Date of Birth */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="dateOfBirth" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Date Of Birth
-                    </label>
-                    <input
-                      required
-                      type="date"
-                      id="dateOfBirth"
-                      name="dateOfBirth"
-                      value={formData.dateOfBirth}
-                      onChange={handleInputChange}
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Occupation */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="occupation" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Occupation
-                    </label>
-                    <input
-                      type="text"
-                      id="occupation"
-                      name="occupation"
-                      value={formData.occupation}
-                      onChange={handleInputChange}
-                      placeholder="Nurse"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Marital Status */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="maritalStatus" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Marital Status
-                    </label>
-                    <select
-                      id="maritalStatus"
-                      name="maritalStatus"
-                      value={formData.maritalStatus}
-                      onChange={handleInputChange}
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    >
-                      <option value="">Choose an option</option>
-                      <option value="Single">Single</option>
-                      <option value="Married">Married</option>
-                      <option value="Separated">Separated</option>
-                      <option value="Widowed">Widowed</option>
-                    </select>
-                  </div>
-                  {/* Phone Number */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="phoneNumber" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Phone Number
-                    </label>
-                    <input
-                      required
-                      type="tel"
-                      id="phoneNumber"
-                      name="phoneNumber"
-                      value={formData.phoneNumber}
-                      onChange={handleInputChange}
-                      placeholder="+63 901 123 4567"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Email Address */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="emailAddress" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Email Address
-                    </label>
-                    <input
-                      required
-                      type="email"
-                      id="emailAddress"
-                      name="emailAddress"
-                      value={formData.emailAddress}
-                      onChange={handleInputChange}
-                      placeholder="juanadelacruz@gmail.com"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Home Address */}
-                  <div className="lg:col-span-2 flex flex-col gap-1.5">
-                    <label htmlFor="homeAddress" className="text-neutral-500 font-sans text-xs font-bold uppercase">
-                      Home Address
-                    </label>
-                    <input
-                      required
-                      type="text"
-                      id="homeAddress"
-                      name="homeAddress"
-                      value={formData.homeAddress}
-                      onChange={handleInputChange}
-                      placeholder="eg. 123 Rizal Ave, Brgy. Bangkal, Makati City"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                </div>
-              </fieldset>
+               {/* SECTION 1: Personal Information */}
+               {registerTab === 1 && (
+                 <fieldset className="space-y-6 animate-in fade-in duration-200">
+                   <legend className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
+                     Personal Information
+                   </legend>
+                   
+                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-6">
+                     {/* First Name */}
+                     <div className="sm:col-span-3 flex flex-col gap-1.5">
+                       <label htmlFor="firstName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         First Name
+                       </label>
+                       <input
+                         required
+                         type="text"
+                         id="firstName"
+                         name="firstName"
+                         value={formData.firstName}
+                         onChange={handleInputChange}
+                         placeholder="Juana Josefina Leonora"
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                     {/* Middle Name */}
+                     <div className="sm:col-span-3 flex flex-col gap-1.5">
+                       <label htmlFor="middleName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Middle Name
+                       </label>
+                       <input
+                         type="text"
+                         id="middleName"
+                         name="middleName"
+                         value={formData.middleName}
+                         onChange={handleInputChange}
+                         placeholder="Santos"
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                     {/* Last Name */}
+                     <div className="sm:col-span-3 flex flex-col gap-1.5">
+                       <label htmlFor="lastName" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Last Name
+                       </label>
+                       <input
+                         required
+                         type="text"
+                         id="lastName"
+                         name="lastName"
+                         value={formData.lastName}
+                         onChange={handleInputChange}
+                         placeholder="Dela Cruz"
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                     {/* Suffix */}
+                     <div className="sm:col-span-3 flex flex-col gap-1.5">
+                       <label htmlFor="suffix" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Suffix
+                       </label>
+                       <select
+                         id="suffix"
+                         name="suffix"
+                         value={formData.suffix}
+                         onChange={handleInputChange}
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       >
+                         <option value="">None</option>
+                         <option value="Jr.">Jr.</option>
+                         <option value="Sr.">Sr.</option>
+                         <option value="II">II</option>
+                         <option value="III">III</option>
+                       </select>
+                     </div>
+                   </div>
+   
+                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                     {/* Date of Birth */}
+                     <div className="flex flex-col gap-1.5">
+                       <label htmlFor="dateOfBirth" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Date Of Birth
+                       </label>
+                       <input
+                         required
+                         type="date"
+                         id="dateOfBirth"
+                         name="dateOfBirth"
+                         value={formData.dateOfBirth}
+                         onChange={handleInputChange}
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                     {/* Occupation */}
+                     <div className="flex flex-col gap-1.5">
+                       <label htmlFor="occupation" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Occupation
+                       </label>
+                       <input
+                         type="text"
+                         id="occupation"
+                         name="occupation"
+                         value={formData.occupation}
+                         onChange={handleInputChange}
+                         placeholder="Nurse"
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                     {/* Marital Status */}
+                     <div className="flex flex-col gap-1.5">
+                       <label htmlFor="maritalStatus" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Marital Status
+                       </label>
+                       <select
+                         id="maritalStatus"
+                         name="maritalStatus"
+                         value={formData.maritalStatus}
+                         onChange={handleInputChange}
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       >
+                         <option value="">Choose an option</option>
+                         <option value="Single">Single</option>
+                         <option value="Married">Married</option>
+                         <option value="Separated">Separated</option>
+                         <option value="Widowed">Widowed</option>
+                       </select>
+                     </div>
+                     {/* Phone Number */}
+                     <div className="flex flex-col gap-1.5">
+                       <label htmlFor="phoneNumber" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Phone Number
+                       </label>
+                       <input
+                         required
+                         type="tel"
+                         id="phoneNumber"
+                         name="phoneNumber"
+                         value={formData.phoneNumber}
+                         onChange={handleInputChange}
+                         placeholder="+63 901 123 4567"
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                   </div>
+   
+                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                     {/* Email Address */}
+                     <div className="flex flex-col gap-1.5">
+                       <label htmlFor="emailAddress" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Email Address
+                       </label>
+                       <input
+                         required
+                         type="email"
+                         id="emailAddress"
+                         name="emailAddress"
+                         value={formData.emailAddress}
+                         onChange={handleInputChange}
+                         placeholder="juanadelacruz@gmail.com"
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                     {/* Home Address */}
+                     <div className="lg:col-span-2 flex flex-col gap-1.5">
+                       <label htmlFor="homeAddress" className="text-neutral-500 font-sans text-xs font-bold uppercase">
+                         Home Address
+                       </label>
+                       <input
+                         required
+                         type="text"
+                         id="homeAddress"
+                         name="homeAddress"
+                         value={formData.homeAddress}
+                         onChange={handleInputChange}
+                         placeholder="eg. 123 Rizal Ave, Brgy. Bangkal, Makati City"
+                         className="border border-neutral-300 rounded-[5px] px-3 py-2 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                       />
+                     </div>
+                   </div>
+                 </fieldset>
+               )}
 
               {/* SECTION 2: Traveling Information */}
-              <fieldset className="space-y-6">
-                <legend className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
-                  Traveling Information
-                </legend>
-
-                <div className="grid grid-cols-1 gap-6">
-                  {/* Travelled outside */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="travelledOutside" className="text-neutral-700 font-sans text-sm font-semibold">
-                      Have you travelled outside the country in the last 5 years?
-                    </label>
-                    <input
-                      type="text"
-                      id="travelledOutside"
-                      name="travelledOutside"
-                      value={formData.travelledOutside}
-                      onChange={handleInputChange}
-                      placeholder="Please clarify yes/no and detail if applicable"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Country visited */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="countriesVisited" className="text-neutral-700 font-sans text-sm font-semibold">
-                      What country have you visited?
-                    </label>
-                    <input
-                      type="text"
-                      id="countriesVisited"
-                      name="countriesVisited"
-                      value={formData.countriesVisited}
-                      onChange={handleInputChange}
-                      placeholder="List countries visited"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Purpose of travel */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="purposeOfTravel" className="text-neutral-700 font-sans text-sm font-semibold">
-                      What were the purpose of your travel?
-                    </label>
-                    <input
-                      type="text"
-                      id="purposeOfTravel"
-                      name="purposeOfTravel"
-                      value={formData.purposeOfTravel}
-                      onChange={handleInputChange}
-                      placeholder="eg. Vacation, Business, Medical..."
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                </div>
-              </fieldset>
-
-              {/* SECTION 3: Donation Information */}
-              <fieldset className="space-y-6">
-                <legend className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
-                  Donation Information
-                </legend>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Reasons for donating */}
-                  <div className="flex flex-col gap-1.5 md:col-span-2">
-                    <label htmlFor="reasonsForDonating" className="text-neutral-700 font-sans text-sm font-semibold">
-                      What are your reasons for donating?
-                    </label>
-                    <input
-                      type="text"
-                      id="reasonsForDonating"
-                      name="reasonsForDonating"
-                      value={formData.reasonsForDonating}
-                      onChange={handleInputChange}
-                      placeholder="Express your motives or reasons"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Spouse support */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="spouseSupport" className="text-neutral-700 font-sans text-sm font-semibold">
-                      Does your spouse support your decision to donate?
-                    </label>
-                    <input
-                      type="text"
-                      id="spouseSupport"
-                      name="spouseSupport"
-                      value={formData.spouseSupport}
-                      onChange={handleInputChange}
-                      placeholder="eg. Yes / No / Not Applicable"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Previously donated */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="previouslyDonated" className="text-neutral-700 font-sans text-sm font-semibold">
-                      Have you previously donated milk?
-                    </label>
-                    <input
-                      type="text"
-                      id="previouslyDonated"
-                      name="previouslyDonated"
-                      value={formData.previouslyDonated}
-                      onChange={handleInputChange}
-                      placeholder="eg. Yes / No"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Last donation date */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="lastDonationDate" className="text-neutral-700 font-sans text-sm font-semibold">
-                      When was your last donation?
-                    </label>
-                    <input
-                      type="text"
-                      id="lastDonationDate"
-                      name="lastDonationDate"
-                      value={formData.lastDonationDate}
-                      onChange={handleInputChange}
-                      placeholder="Please specify date if applicable"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Where did you donate */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="donationLocation" className="text-neutral-700 font-sans text-sm font-semibold">
-                      Where did you donate?
-                    </label>
-                    <input
-                      type="text"
-                      id="donationLocation"
-                      name="donationLocation"
-                      value={formData.donationLocation}
-                      onChange={handleInputChange}
-                      placeholder="Specify clinic, center, or bank"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                  {/* Why did you stop donating */}
-                  <div className="flex flex-col gap-1.5 md:col-span-2">
-                    <label htmlFor="whyStoppedDonating" className="text-neutral-700 font-sans text-sm font-semibold">
-                      Why did you stop donating?
-                    </label>
-                    <input
-                      type="text"
-                      id="whyStoppedDonating"
-                      name="whyStoppedDonating"
-                      value={formData.whyStoppedDonating}
-                      onChange={handleInputChange}
-                      placeholder="Detail reasons"
-                      className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
-                    />
-                  </div>
-                </div>
-              </fieldset>
-
-              {/* SECTION 4: Medical History */}
-              <div className="space-y-6">
-                <h3 className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
-                  Medical History Questionnaire
-                </h3>
-
-                <div className="border border-neutral-200 rounded-[15px] overflow-hidden divide-y divide-neutral-200 shadow-sm">
-                  
-                  {/* Category 1: Infectious & Medical Illness History */}
-                  <div>
-                    <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base flex justify-between">
-                      <span>Infectious & Medical Illness History</span>
-                      <span className="text-neutral-500 hidden sm:inline">Yes/No Selection</span>
+              {registerTab === 2 && (
+                <>
+                  <fieldset className="space-y-6">
+                    <legend className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
+                      Traveling Information
+                    </legend>
+    
+                    <div className="grid grid-cols-1 gap-6">
+                      {/* Travelled outside */}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="travelledOutside" className="text-neutral-700 font-sans text-sm font-semibold">
+                          Have you travelled outside the country in the last 5 years?
+                        </label>
+                        <input
+                          type="text"
+                          id="travelledOutside"
+                          name="travelledOutside"
+                          value={formData.travelledOutside}
+                          onChange={handleInputChange}
+                          placeholder="Please clarify yes/no and detail if applicable"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
+                      {/* Country visited */}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="countriesVisited" className="text-neutral-700 font-sans text-sm font-semibold">
+                          What country have you visited?
+                        </label>
+                        <input
+                          type="text"
+                          id="countriesVisited"
+                          name="countriesVisited"
+                          value={formData.countriesVisited}
+                          onChange={handleInputChange}
+                          placeholder="List countries visited"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
+                      {/* Purpose of travel */}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="purposeOfTravel" className="text-neutral-700 font-sans text-sm font-semibold">
+                          What were the purpose of your travel?
+                        </label>
+                        <input
+                          type="text"
+                          id="purposeOfTravel"
+                          name="purposeOfTravel"
+                          value={formData.purposeOfTravel}
+                          onChange={handleInputChange}
+                          placeholder="eg. Vacation, Business, Medical..."
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      {renderMedicalRow('Tuberculosis', 'tuberculosis', false)}
-                      {renderMedicalRow('Hepatitis B', 'hepatitisB', true)}
-                      {renderMedicalRow('Mastitis / Breast inflammation', 'mastitis', false)}
-                      {renderMedicalRow('Syphilis', 'syphilis', true)}
-                      {renderMedicalRow('Herpes', 'herpes', false)}
-                      {renderMedicalRow('Sexually Transmitted Disease (STD)', 'std', true)}
+                  </fieldset>
+    
+                  {/* SECTION 3: Donation Information */}
+                  <fieldset className="space-y-6">
+                    <legend className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
+                      Donation Information
+                    </legend>
+    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Reasons for donating */}
+                      <div className="flex flex-col gap-1.5 md:col-span-2">
+                        <label htmlFor="reasonsForDonating" className="text-neutral-700 font-sans text-sm font-semibold">
+                          What are your reasons for donating?
+                        </label>
+                        <input
+                          type="text"
+                          id="reasonsForDonating"
+                          name="reasonsForDonating"
+                          value={formData.reasonsForDonating}
+                          onChange={handleInputChange}
+                          placeholder="Express your motives or reasons"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
+                      {/* Spouse support */}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="spouseSupport" className="text-neutral-700 font-sans text-sm font-semibold">
+                          Does your spouse support your decision to donate?
+                        </label>
+                        <input
+                          type="text"
+                          id="spouseSupport"
+                          name="spouseSupport"
+                          value={formData.spouseSupport}
+                          onChange={handleInputChange}
+                          placeholder="eg. Yes / No / Not Applicable"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
+                      {/* Previously donated */}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="previouslyDonated" className="text-neutral-700 font-sans text-sm font-semibold">
+                          Have you previously donated milk?
+                        </label>
+                        <input
+                          type="text"
+                          id="previouslyDonated"
+                          name="previouslyDonated"
+                          value={formData.previouslyDonated}
+                          onChange={handleInputChange}
+                          placeholder="eg. Yes / No"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
+                      {/* Last donation date */}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="lastDonationDate" className="text-neutral-700 font-sans text-sm font-semibold">
+                          When was your last donation?
+                        </label>
+                        <input
+                          type="text"
+                          id="lastDonationDate"
+                          name="lastDonationDate"
+                          value={formData.lastDonationDate}
+                          onChange={handleInputChange}
+                          placeholder="Please specify date if applicable"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
+                      {/* Where did you donate */}
+                      <div className="flex flex-col gap-1.5">
+                        <label htmlFor="donationLocation" className="text-neutral-700 font-sans text-sm font-semibold">
+                          Where did you donate?
+                        </label>
+                        <input
+                          type="text"
+                          id="donationLocation"
+                          name="donationLocation"
+                          value={formData.donationLocation}
+                          onChange={handleInputChange}
+                          placeholder="Specify clinic, center, or bank"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
+                      {/* Why did you stop donating */}
+                      <div className="flex flex-col gap-1.5 md:col-span-2">
+                        <label htmlFor="whyStoppedDonating" className="text-neutral-700 font-sans text-sm font-semibold">
+                          Why did you stop donating?
+                        </label>
+                        <input
+                          type="text"
+                          id="whyStoppedDonating"
+                          name="whyStoppedDonating"
+                          value={formData.whyStoppedDonating}
+                          onChange={handleInputChange}
+                          placeholder="Detail reasons"
+                          className="border border-neutral-300 rounded-[5px] px-3 py-2.5 font-sans text-sm focus:outline-none focus:ring-1 focus:ring-brand-teal focus:border-brand-teal"
+                        />
+                      </div>
                     </div>
-                  </div>
+    
+                    {/* Form Actions Footer */}
+                    <div className="flex justify-between pt-6 border-t border-neutral-100">
+                      <div>
+                        {registerTab > 1 && (
+                          <button
+                            key="register-prev-btn"
+                            type="button"
+                            onClick={() => setRegisterTab((t) => Math.max(1, t - 1))}
+                            className="px-6 py-2.5 text-sm font-bold text-neutral-600 hover:text-neutral-800 bg-white border border-neutral-200 rounded-xl transition-all cursor-pointer"
+                          >
+                            Previous
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          key="register-next-btn"
+                          type="button"
+                          onClick={() => setRegisterTab((t) => Math.min(3, t + 1))}
+                          className="px-6 py-2.5 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-dark rounded-xl transition-all cursor-pointer"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </fieldset>
+                </>
+              )}
 
-                  {/* Category 2: Substance Use & Habits */}
-                  <div>
-                    <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
-                      Substance Use & Habits
-                    </div>
-                    <div>
-                      {renderMedicalRow('Have you consumed alcohol in the last 24 hours?', 'alcohol24h', false)}
-                      {renderMedicalRow('Do you smoke?', 'smoke', true)}
-                      {renderMedicalRow('Do you use any illegal/prohibited drugs?', 'illegalDrugs', false)}
-                      {renderMedicalRow('Intravenous drug use?', 'intravenousDrugs', true)}
-                    </div>
-                  </div>
+               {/* SECTION 3: Medical History */}
+               {registerTab === 3 && (
+                 <div className="space-y-12 animate-in fade-in duration-200">
+                   <div className="space-y-6">
+                     <h3 className="text-lg sm:text-xl font-sans font-bold text-neutral-950 uppercase tracking-wide border-l-4 border-brand-teal pl-3">
+                       Medical History Questionnaire
+                     </h3>
+                     
+                     <div className="border border-neutral-100 rounded-[20px] overflow-hidden shadow-sm">
+                       {/* Category 1: Infectious & Medical Illness History */}
+                       <div>
+                         <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
+                           Infectious & Medical Illness History
+                         </div>
+                         <div>
+                           {renderMedicalRow('History of Tuberculosis?', 'tuberculosis', false)}
+                           {renderMedicalRow('Hepatitis B Carrier?', 'hepatitisB', true)}
+                           {renderMedicalRow('Mastitis / Breast inflammation?', 'mastitis', false)}
+                           {renderMedicalRow('History of Syphilis?', 'syphilis', true)}
+                           {renderMedicalRow('Active Herpes Lesions?', 'herpes', false)}
+                           {renderMedicalRow('Sexually Transmitted Disease (STD)?', 'std', true)}
+                         </div>
+                       </div>
+     
+                       {/* Category 2: Substance Use & Habits */}
+                       <div>
+                         <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
+                           Substance Use & Habits
+                         </div>
+                         <div>
+                           {renderMedicalRow('Consumed alcohol in the past 24 hours?', 'alcohol24h', false)}
+                           {renderMedicalRow('Do you smoke?', 'smoke', true)}
+                           {renderMedicalRow('Use any illegal/prohibited drugs?', 'illegalDrugs', false)}
+                           {renderMedicalRow('Intravenous drug use?', 'intravenousDrugs', true)}
+                         </div>
+                       </div>
+     
+                       {/* Category 3: Dietary & Supplement Tracking */}
+                       <div>
+                         <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
+                           Dietary & Supplement Tracking
+                         </div>
+                         <div>
+                           {renderMedicalRow('Are you on a vegetarian diet?', 'vegetarianDiet', false)}
+                           {renderMedicalRow('Do you take multivitamins?', 'takeMultivitamins', true)}
+                           {renderMedicalRow('Do you take herbal drugs or high-dose vitamins?', 'takeHerbalDrugs', false)}
+                         </div>
+                       </div>
+     
+                       {/* Category 4: Blood Exposure & Transfusion History */}
+                       <div>
+                         <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
+                           Blood Exposure & Transfusion History
+                         </div>
+                         <div>
+                           {renderMedicalRow('Have you received blood or blood products in the past 12 months?', 'receivedBlood', false)}
+                           {renderMedicalRow('Have you ever been accidentally pricked by a needle contaminated with blood?', 'accidentalNeedlePrick', true)}
+                           {renderMedicalRow('Received repeated blood transfusion?', 'repeatedTransfusions', false)}
+                         </div>
+                       </div>
+     
+                       {/* Category 5: Surgical & Specialized Medical History */}
+                       <div>
+                         <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
+                           Surgical & Specialized Medical History
+                         </div>
+                         <div>
+                           {renderMedicalRow('Do you take birth control pills or hormone replacement therapy?', 'birthControlPills', false)}
+                           {renderMedicalRow('Have you had breast surgery?', 'breastSurgery', true)}
+                           {renderMedicalRow('Was a breast implant placed?', 'breastImplant', false)}
+                         </div>
+                       </div>
+     
+                       {/* Category 6: High-Risk Exposure & Behavioral Factors */}
+                       <div>
+                         <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
+                           High-Risk Exposure & Behavioral Factors
+                         </div>
+                         <div>
+                           {renderMedicalRow('Do you have any tattoos on any part of your body?', 'tattoos', false)}
+                           {renderMedicalRow('Have you had sexual contact with more than one partner?', 'multiplePartners', true)}
+                           {renderMedicalRow('Sexual contact with a partner diagnosed with STI/AIDS/HIV?', 'partnerDiagnosedSti', false)}
+                         </div>
+                       </div>
+     
+                     </div>
+     
+                     <div className="text-neutral-500 font-sans text-sm italic mt-4 text-center sm:text-left">
+                       Note: A medical professional will follow up to review these details in person. Donors must NOT use illegal drugs, smoke, or consume excess alcohol.
+                     </div>
+                   </div>
+     
+                   {/* Form Actions Footer */}
+                   <div className="flex justify-between pt-6 border-t border-neutral-100">
+                     <div>
+                       {registerTab > 1 && (
+                         <button
+                           key="register-prev-btn"
+                           type="button"
+                           onClick={() => setRegisterTab((t) => Math.max(1, t - 1))}
+                           className="px-6 py-2.5 text-sm font-bold text-neutral-600 hover:text-neutral-800 bg-white border border-neutral-200 rounded-xl transition-all cursor-pointer"
+                         >
+                           Previous
+                         </button>
+                       )}
+                     </div>
+     
+                     <div className="flex gap-3">
+                       <button
+                         key="register-submit-btn"
+                         type="submit"
+                         disabled={isSubmitting}
+                         className="bg-brand-teal hover:bg-brand-teal-dark disabled:bg-neutral-300 text-white font-sans font-bold text-base px-10 py-3 rounded-[10px] transition-all duration-200 shadow-[0_4px_14_rgba(0,175,185,0.25)] hover:shadow-[0_4px_20px_rgba(0,175,185,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:translate-y-0 disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer"
+                       >
+                         {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+               )}
 
-                  {/* Category 3: Dietary & Supplement Tracking */}
-                  <div>
-                    <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
-                      Dietary & Supplement Tracking
-                    </div>
-                    <div>
-                      {renderMedicalRow('Are you on a vegetarian diet?', 'vegetarianDiet', false)}
-                      {renderMedicalRow('Do you take multivitamins?', 'takeMultivitamins', true)}
-                      {renderMedicalRow('Do you take herbal drugs or high-dose vitamins?', 'takeHerbalDrugs', false)}
-                    </div>
-                  </div>
-
-                  {/* Category 4: Blood Exposure & Transfusion History */}
-                  <div>
-                    <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
-                      Blood Exposure & Transfusion History
-                    </div>
-                    <div>
-                      {renderMedicalRow('Have you received blood or blood products in the past 12 months?', 'receivedBlood', false)}
-                      {renderMedicalRow('Have you ever been accidentally pricked by a needle contaminated with blood?', 'accidentalNeedlePrick', true)}
-                      {renderMedicalRow('Received repeated blood transfusion?', 'repeatedTransfusions', false)}
-                    </div>
-                  </div>
-
-                  {/* Category 5: Surgical & Specialized Medical History */}
-                  <div>
-                    <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
-                      Surgical & Specialized Medical History
-                    </div>
-                    <div>
-                      {renderMedicalRow('Do you take birth control pills or hormone replacement therapy?', 'birthControlPills', false)}
-                      {renderMedicalRow('Have you had breast surgery?', 'breastSurgery', true)}
-                      {renderMedicalRow('Was a breast implant placed?', 'breastImplant', false)}
-                    </div>
-                  </div>
-
-                  {/* Category 6: High-Risk Exposure & Behavioral Factors */}
-                  <div>
-                    <div className="bg-neutral-100/70 p-4 font-sans font-bold text-neutral-900 text-sm sm:text-base">
-                      High-Risk Exposure & Behavioral Factors
-                    </div>
-                    <div>
-                      {renderMedicalRow('Do you have any tattoos on any part of your body?', 'tattoos', false)}
-                      {renderMedicalRow('Have you had sexual contact with more than one partner?', 'multiplePartners', true)}
-                      {renderMedicalRow('Sexual contact with a partner diagnosed with STI/AIDS/HIV?', 'partnerDiagnosedSti', false)}
-                    </div>
-                  </div>
-
-                </div>
-
-                <div className="text-neutral-500 font-sans text-sm italic mt-4 text-center sm:text-left">
-                  Note: A medical professional will follow up to review these details in person. Donors must NOT use illegal drugs, smoke, or consume excess alcohol.
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <div className="flex justify-end pt-6 border-t border-neutral-100">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto bg-brand-teal hover:bg-brand-teal-dark disabled:bg-neutral-300 text-white font-sans font-bold text-base px-10 py-3.5 rounded-full transition-all duration-200 shadow-[0_4px_14px_rgba(0,175,185,0.25)] hover:shadow-[0_4px_20px_rgba(0,175,185,0.4)] hover:-translate-y-0.5 active:translate-y-0 disabled:translate-y-0 disabled:shadow-none flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Application'
-                  )}
-                </button>
-              </div>
-
-            </form>
+             </form>
+           </>
           )}
 
         </div>
