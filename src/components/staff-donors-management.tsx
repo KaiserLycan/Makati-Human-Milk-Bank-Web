@@ -493,7 +493,9 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           dateJoined: d.joined_date ? new Date(d.joined_date).toISOString().split('T')[0] : 'N/A',
           dateApplied: d.created_at ? new Date(d.created_at).toISOString().split('T')[0] : 'N/A',
           dob: d.birth_date ? d.birth_date.split('T')[0] : 'N/A',
-          lastDonation: donationInfo.last_donation || 'N/A',
+          lastDonation: d.last_system_donation
+            ? new Date(d.last_system_donation).toISOString().split('T')[0]
+            : (donationInfo.last_donation || 'N/A'),
           occupation: personal.occupation || '',
           maritalStatus: personal.marital_status || '',
           address: personal.home_address || '',
@@ -505,8 +507,10 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           donationReasons: donationInfo.reason || '',
           spouseSupport: donationInfo.spouse_consent === 'yes' ? 'Yes' : 'No',
           prevDonations: donationInfo.previously_donated === 'yes' ? 'Yes' : 'No',
-          lastDonationDate: donationInfo.last_donation || '',
-          lastDonationLocation: donationInfo.place_donated || '',
+          lastDonationDate: d.last_system_donation
+            ? new Date(d.last_system_donation).toISOString().split('T')[0]
+            : (donationInfo.last_donation || ''),
+          lastDonationLocation: d.last_system_donation ? 'System Recorded Collection' : (donationInfo.place_donated || ''),
           stoppedReason: donationInfo.reason_for_stopping || '',
 
           medicalHistory: {
