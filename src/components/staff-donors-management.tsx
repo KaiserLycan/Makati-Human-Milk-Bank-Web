@@ -458,15 +458,8 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
   const fetchAllDonors = async () => {
     setIsLoadingData(true);
     try {
-      // 1. CONSTRUCT QUERY
-      let queryParam = '';
-      if (statusFilter !== 'All') {
-        const key = mode === 'donors' ? 'status' : 'application_status';
-        queryParam = `?${key}=${statusFilter.toLowerCase()}`;
-      }
-
-      // 2. FETCH DATA
-      const response = await api.get(`/api/donors${queryParam}`);
+      // 1. FETCH DATA
+      const response = await api.get('/api/donors');
       
       // THE HEAT-SEEKING MISSILE (Refined for pagination support)
       let rawArray: any[] = [];
@@ -667,6 +660,14 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       );
     }
 
+    // Local Status Filter
+    if (statusFilter !== 'All') {
+      result = result.filter((d) => {
+        const itemStatus = mode === 'donors' ? d.status : (d as Applicant).application_status;
+        return itemStatus.toLowerCase() === statusFilter.toLowerCase();
+      });
+    }
+
     // Local Sorting
     result.sort((a: any, b: any) => {
       let valA = a[sortBy];
@@ -751,7 +752,11 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
       const donorPayload = {
         name: newDonorForm.name,
         email: newDonorForm.email,
-        phone: newDonorForm.phone,
+        phone: newDonorForm.phone.startsWith('+') 
+          ? newDonorForm.phone 
+          : newDonorForm.phone.startsWith('0') 
+            ? `+63${newDonorForm.phone.slice(1)}` 
+            : `+63${newDonorForm.phone}`,
         birth_date: newDonorForm.dob,
         profile: {
           personal_information: {
@@ -813,11 +818,9 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
           headers: { 'Content-Type': 'application/json' },
         });
       } else {
-        // POST request: Backend needs FormData for the image-upload middleware
-        const formData = new FormData();
-        formData.append("json", JSON.stringify(donorPayload));
-        await api.post('/api/donors/register', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        // POST request: Send as JSON (same as PUT)
+        await api.post('/api/donors/register', donorPayload, {
+          headers: { 'Content-Type': 'application/json' },
         });
       }
 
@@ -952,7 +955,7 @@ export default function StaffDonorsManagement({ mode }: StaffDonorsManagementPro
                     <ul className="py-1">
                       {(mode === 'donors'
                         ? ['All', 'Active', 'Inactive', 'Pending']
-                        : ['All', 'Approved', 'Pending', 'Rejected']
+                        : ['All', 'Pending', 'Rejected']
                       ).map((status) => (
                         <li key={status}>
                           <button
