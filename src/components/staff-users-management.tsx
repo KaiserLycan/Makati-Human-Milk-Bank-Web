@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import StaffSidebar from './ui/staff-sidebar';
 import StaffNotificationBell from './ui/staff-notification-bell';
+import StaffAccessDenied from './ui/staff-access-denied';
 import { api } from '../utils/api';
 import {
   loadProfile,
@@ -286,27 +287,7 @@ export default function StaffUsersManagement() {
   // Role Protection
   if (profile && profile.role !== 'manager') {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center p-6 text-center font-sans">
-        <div className="bg-slate-800 border border-slate-700/50 rounded-3xl p-8 max-w-md w-full shadow-2xl relative overflow-hidden space-y-6">
-          <div className="size-20 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-center mx-auto text-rose-500">
-            <ShieldAlert className="size-10" />
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-xl font-bold tracking-tight">Access Denied</h3>
-            <p className="text-sm text-slate-400 leading-normal">
-              You do not have manager permissions to view this user management console. If you require access, please contact your administrator.
-            </p>
-          </div>
-          <Link
-            href="/work/dashboard"
-            className="flex items-center justify-center gap-2 w-full py-3 text-sm font-bold text-white bg-brand-teal hover:bg-brand-teal-darker rounded-xl transition-all duration-200 shadow-md"
-            data-testid="access-denied-home-btn"
-          >
-            Return to Dashboard
-            <ArrowRight className="size-4" />
-          </Link>
-        </div>
-      </div>
+      <StaffAccessDenied message="You do not have manager permissions to view this user management console. If you require access, please contact your administrator." />
     );
   }
 
