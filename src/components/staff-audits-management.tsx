@@ -154,6 +154,48 @@ export default function StaffAuditsManagement() {
     }
   };
 
+  const highlightJSON = (jsonStr: string) => {
+    if (!jsonStr) return null;
+    try {
+      const jsonRegex = /("(?:\\[\s\S]|[^\\"])*"(?:\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g;
+      const parts = jsonStr.split(jsonRegex);
+
+      return parts.map((part, index) => {
+        if (part === undefined || part === null || part === '') return null;
+
+        if (/^"/.test(part)) {
+          if (/:$/.test(part)) {
+            // Key
+            return <span key={index} className="text-blue-700 font-bold">{part}</span>;
+          } else {
+            // String value
+            return <span key={index} className="text-emerald-600 font-medium">{part}</span>;
+          }
+        } else if (/^(?:true|false)$/.test(part)) {
+          // Boolean
+          return <span key={index} className="text-violet-600 font-bold">{part}</span>;
+        } else if (part === 'null') {
+          // Null
+          return <span key={index} className="text-rose-500 font-bold">{part}</span>;
+        } else if (/^-?\d+/.test(part)) {
+          // Number
+          return <span key={index} className="text-amber-600 font-bold">{part}</span>;
+        }
+
+        // Plain punctuation, spacing, etc.
+        return <span key={index} className="text-neutral-500">{part}</span>;
+      });
+    } catch {
+      return <span className="text-neutral-700">{jsonStr}</span>;
+    }
+  };
+
+  const renderAuditData = (data: any) => {
+    const formatted = formatJSON(data);
+    if (!formatted) return <span className="text-neutral-400 italic">None</span>;
+    return highlightJSON(formatted);
+  };
+
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -544,8 +586,8 @@ export default function StaffAuditsManagement() {
                 {selectedAudit.old_data && (
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">Old Data</label>
-                    <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto">
-                      {formatJSON(selectedAudit.old_data)}
+                    <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold leading-normal text-[10px] overflow-x-auto">
+                      {renderAuditData(selectedAudit.old_data)}
                     </pre>
                   </div>
                 )}
@@ -553,8 +595,8 @@ export default function StaffAuditsManagement() {
                 {selectedAudit.new_data && (
                   <div>
                     <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-1">New Data</label>
-                    <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold text-neutral-700 leading-normal text-[10px] overflow-x-auto">
-                      {formatJSON(selectedAudit.new_data)}
+                    <pre className="bg-slate-50 border border-neutral-100 rounded-xl p-3.5 font-semibold leading-normal text-[10px] overflow-x-auto">
+                      {renderAuditData(selectedAudit.new_data)}
                     </pre>
                   </div>
                 )}
