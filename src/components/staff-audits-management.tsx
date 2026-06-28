@@ -292,13 +292,6 @@ export default function StaffAuditsManagement() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <p className="text-neutral-400 text-sm font-medium">Loading...</p>
-      </div>
-    );
-  }
 
   if (user && user.role !== 'manager') {
     return (
